@@ -10,12 +10,12 @@ from src.util.constants import BITMAP_COLUMNS, BITMAP_GLYPH_SIZE
 from src.util.functions import progress_bar
 
 def read_provider_bitmap(provider):
-    print(f" → 🖼️ Reading '{provider['file_name']}'...")
+    print(f"→ 🖼️ Reading '{provider['file_name']}'...")
     img = Image.open(provider["file_path"]).convert("RGBA")
     width, height = img.size
     bmp_tiles = []
 
-    print(f" → 🏁 Converting to grayscale...")
+    print(f"→ 🏁 Converting to grayscale...")
     # Composite white glyphs over black background
     bg = Image.new("RGBA", img.size, (0, 0, 0, 255)) # Black background
     img = Image.alpha_composite(bg, img).convert("L") # Grayscale
@@ -41,7 +41,7 @@ def slice_bitmap_into_bmp(provider):
     glyph_height = provider["glyph_height"]
     bmp_tiles = []
 
-    print(f" → 🖼️ Creating BMP tiles...")
+    print(f"→ 🧩 Creating BMP tiles...")
     for idx, y in enumerate(range(0, height, glyph_height)):
         for x in range(0, width, glyph_width):
             tile_row = y // glyph_width
@@ -51,7 +51,7 @@ def slice_bitmap_into_bmp(provider):
 
             # Skip tiles without corresponding Unicode entry
             if index >= len(provider["chars"]):
-                print(f"  → ⚠️ Failed to load glyph {index}@{tile_row},{tile_column}.")
+                print(f" → ⚠️ Failed to load glyph {index}@{tile_row},{tile_column}.")
                 continue
 
             # Load glyph
@@ -69,7 +69,7 @@ def slice_bitmap_into_bmp(provider):
     return bmp_tiles
 
 def convert_bmp_into_svg(provider):
-    print(" → ✒️ Creating SVG files...")
+    print("→ ✒️ Creating SVG files...")
     svg_files = []
     total_chars = len(provider["chars"])
     index = 0
@@ -124,13 +124,13 @@ def convert_bmp_into_svg(provider):
     return svg_files
 
 def read_json_file(json_file):
-    print(f"📄 Reading '{json_file}'...")
+    print(f"🧩 Parsing '{json_file}'...")
 
     with open(json_file, "rb") as f:
         raw_bytes = f.read()
 
     # Decode and parse JSON while preserving surrogate pairs
-    print("→ 🛠️ Parsing json...")
+    print("→ 🛠️ Decoding json...")
     raw_text = raw_bytes.decode("utf-8", errors="surrogatepass")
     data = json.loads(raw_text)
 
@@ -141,11 +141,10 @@ def read_json_file(json_file):
             file_name = provider.get("file", "minecraft:font/").split("minecraft:font/")[-1]
             name = os.path.splitext(file_name)[0]
             output = OUTPUT_PATH + "/" + name
-            print(f"→ 🛠️ Parsing '{name}'...")
 
             # Read unicode characters
             flat_chars = [char for row in provider.get("chars", []) for char in row]
-            print(f" → 🔢 Detected {len(flat_chars)} unicode characters...")
+            print(f" → 🔢 Detected {len(flat_chars)} unicode characters in '{name}'...")
 
             entry = {
                 "chars": flat_chars,
@@ -161,12 +160,13 @@ def read_json_file(json_file):
 
             # Create output directory
             os.makedirs(entry["tile_output"], exist_ok=True)
-
-            # Read provider
-            entry["image"] = read_provider_bitmap(entry)
-            entry["bmp_tiles"] = slice_bitmap_into_bmp(entry)
-            entry["svg_files"] = convert_bmp_into_svg(entry)
             providers.append(entry)
+
+    print(f"✂️ Slicing bitmap providers into tiles...")
+    for provider in providers:
+        provider["image"] = read_provider_bitmap(provider)
+        provider["bmp_tiles"] = slice_bitmap_into_bmp(provider)
+        provider["svg_files"] = convert_bmp_into_svg(provider)
 
     return providers
 
