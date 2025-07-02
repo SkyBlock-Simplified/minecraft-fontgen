@@ -1,0 +1,13 @@
+from src.util.constants import FONT_NAME
+
+MINECRAFT_JAR_FONT_DIR = "font/"
+MINECRAFT_JAR_FONT_JSON_DIR = MINECRAFT_JAR_FONT_DIR + "include/"
+MINECRAFT_JAR_DEFAULT_JSON = MINECRAFT_JAR_FONT_JSON_DIR + "default.json"
+
+OPENTYPE = True
+CREATE_BMP = True
+CREATE_SMP = False
+
+SVG_WIDTH = 256
+OUTPUT_PATH = "output"
+OUTPUT_FILE_PATH = OUTPUT_PATH + "/" + FONT_NAME + (".otf" if OPENTYPE else ".ttf")
