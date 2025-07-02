@@ -1,8 +1,6 @@
 from fontTools.ttLib import TTFont
 
-from src.classes.glyph_storage import GlyphStorage
-from src.classes.svg import Svg
-from src.classes.unicode_char import UnicodeChar
+from src.glyph.glyph_storage import GlyphStorage
 from src.table.glyph_mappings import create_font_mapping_table
 from src.table.header import create_font_header_table
 from src.table.horizontal_header import create_font_hheader_table
@@ -26,28 +24,24 @@ def convert_unicode_to_glyphs(providers, glyph_storage):
             progress_bar(index, total_chars)
             index += 1
 
-            # Load unicode
-            unicode = UnicodeChar(unicode_char)
+            # Load glyph
+            glyph = glyph_storage.new_glyph(provider, unicode_char, svg_file)
 
             # Skip invalid and .notdef characters
-            if unicode.codepoint is None:
-                print(f" → ⚠️ Skipping invalid unicode '0x{unicode.codepoint:04X}'.")
-                continue
-            elif unicode.codepoint == 0x0000:
+            if not glyph.valid():
                 continue
 
-            # Load svg file and path
-            svg = Svg(svg_file)
-            svg.read_path()
+            # Read svg path
+            glyph.read_path()
 
-            # Adjust scaling and positioning
-            svg_path = svg.scale(provider["glyph_height"])
+            # Scale svg
+            glyph.scale()
 
-            # Draw svg path
-            pen = glyph_storage.draw(svg_path)
+            # Draw svg
+            glyph.draw()
 
             # Save glyph
-            glyph_storage.add(unicode, pen)
+            glyph_storage.add(glyph)
 
     # Finish the progress bar
     progress_bar(total_chars, total_chars)
@@ -86,8 +80,8 @@ def create_font_file(providers, use_cff: bool = True):
     # Convert unicode to glyphs
     convert_unicode_to_glyphs(providers, glyph_storage)
 
-    # Sort glyphs
-    glyph_storage.sort()
+    # Add .notdef
+    glyph_storage.add_notdef()
 
     # Write glyphs
     glyph_storage.write()
