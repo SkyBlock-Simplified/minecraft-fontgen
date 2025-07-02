@@ -1,9 +1,7 @@
 from file_io import read_json_file, clean_output_dir
 from font_creator import create_font_file
-from print_cff_debug_info import print_cff_debug_info
 from src.util.config import OUTPUT_FILE_PATH, MINECRAFT_JAR_DEFAULT_JSON, OPENTYPE
-
-
+from src.util.inspect import inspect_font_file
 
 def main():
     # Clean previous output
@@ -16,10 +14,10 @@ def main():
     glyph_storage = create_font_file(providers, OPENTYPE)
 
     # Save font file
-    print_cff_debug_info(glyph_storage.font)
-    glyph_storage.font.save(OUTPUT_FILE_PATH)
+    glyph_storage.save(OUTPUT_FILE_PATH)
 
-    # Validate font file
+    # Inspect font file
+    inspect_font_file(OUTPUT_FILE_PATH)
 
     print("✨ Done.")
 
