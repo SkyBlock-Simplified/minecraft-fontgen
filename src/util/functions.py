@@ -1,5 +1,6 @@
-def progress_bar(current, total, width=40):
+def progress_bar(current, total, padding=2, width=40):
     progress = current / total
     filled = int(width * progress)
     bar = '█' * filled + '-' * (width - filled)
-    print(f"\r  [{bar}] {current}/{total}", end='', flush=True)
+    left_pad = ' ' * padding
+    print(f"\r{left_pad}[{bar}] {current}/{total}", end='', flush=True)
