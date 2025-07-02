@@ -15,14 +15,6 @@ from src.table.postscript import create_font_pscript_table
 from src.table.truetype import create_tt_font_tables
 from src.util.functions import progress_bar
 
-def post_table_processing(glyph_storage: GlyphStorage, use_cff: bool = True):
-    glyph_storage.font["hmtx"].metrics = glyph_storage.hmtx
-    total_glyphs = len(glyph_storage.glyphs)
-    glyph_storage.font["hhea"].numberOfHMetrics = total_glyphs # Number of advanceWidth + leftSideBearing pairs in the hmtx table
-    glyph_storage.font["maxp"].numGlyphs = total_glyphs # Total number of glyphs in the font
-    glyph_storage.font["OS/2"].usFirstCharIndex = glyph_storage.cpr[0] # First Unicode codepoint in the font
-    glyph_storage.font["OS/2"].usLastCharIndex = glyph_storage.cpr[1] # Last Unicode codepoint in the font
-
 def convert_unicode_to_glyphs(providers, glyph_storage):
     total_chars = sum(len(provider["chars"]) for provider in providers)
     print(f"→ 🔣 Converting {total_chars} unicode to glyphs...")
@@ -97,10 +89,7 @@ def create_font_file(providers, use_cff: bool = True):
     # Sort glyphs
     glyph_storage.sort()
 
-    # Save glyphs
-    glyph_storage.save()
-
-    # Table post-processing
-    post_table_processing(glyph_storage, use_cff)
+    # Write glyphs
+    glyph_storage.write()
 
     return glyph_storage
