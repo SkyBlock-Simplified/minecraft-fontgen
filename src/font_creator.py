@@ -24,8 +24,8 @@ def convert_unicode_to_glyphs(providers, glyph_storage):
             progress_bar(index, total_chars)
             index += 1
 
-            # Load glyph
-            glyph = glyph_storage.new_glyph(provider, unicode_char, svg_file)
+            # Create new glyph
+            glyph = glyph_storage.new_glyph(unicode_char, svg_file, provider)
 
             # Skip invalid and .notdef characters
             if not glyph.valid():
