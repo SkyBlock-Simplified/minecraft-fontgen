@@ -3,11 +3,9 @@ import json
 import shutil
 
 from PIL import Image
-from src.classes.unicode_char import UnicodeChar
 from src.util.config import OUTPUT_PATH, MINECRAFT_JAR_FONT_DIR
 from src.util.constants import BITMAP_COLUMNS, BITMAP_GLYPH_SIZE
-
-from src.util.functions import progress_bar
+from src.util.functions import progress_bar, get_unicode_codepoint
 
 def read_provider_bitmap(provider):
     print(f"→ 🖼️ Reading '{provider['file_name']}'...")
@@ -55,8 +53,8 @@ def slice_bitmap_into_bmp(provider):
                 continue
 
             # Load glyph
-            unicode = UnicodeChar(provider["chars"][index])
-            tile_dir = f"{provider['tile_output']}/{tile_row:02}_{tile_column:02}_{unicode.codepoint:04X}"
+            codepoint = get_unicode_codepoint(provider["chars"][index])
+            tile_dir = f"{provider['tile_output']}/{tile_row:02}_{tile_column:02}_{codepoint:04X}"
             tile_path = f"{tile_dir}/glyph.bmp"
 
             # Create tile directory
