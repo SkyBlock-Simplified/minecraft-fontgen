@@ -9,35 +9,24 @@ from src.util.constants import UNITS_PER_EM, BITMAP_GLYPH_SIZE, NOTDEF, NOTDEF_G
 from src.util.functions import get_unicode_codepoint
 
 class Glyph:
-    def __init__(self, use_cff: bool = True):
-        print(f"→ 🅽 Creating '{NOTDEF}' glyph...")
-        self.unicode = None
-        self.codepoint = 0x0000
-        self.name = NOTDEF
-        self.width = BITMAP_GLYPH_SIZE
-        self.height = BITMAP_GLYPH_SIZE
-        self.svg_file = None
-        self.svg_path = None
-        self.use_cff = use_cff
-        self.pen = self._new_pen()
-
-        # Draw rectangle using the bounding box
-        self.pen.moveTo((NOTDEF_GLYPH[0], NOTDEF_GLYPH[1]))
-        self.pen.lineTo((NOTDEF_GLYPH[0], NOTDEF_GLYPH[3]))
-        self.pen.lineTo((NOTDEF_GLYPH[2], NOTDEF_GLYPH[3]))
-        self.pen.lineTo((NOTDEF_GLYPH[2], NOTDEF_GLYPH[1]))
-        self.pen.closePath()
-
-    def __init__(self, unicode: str, svg_file, provider, use_cff: bool = True):
+    def __init__(self, unicode, codepoint: int = None, use_cff: bool = True, svg_file: str = None, provider = None):
         self.unicode = unicode
-        self.codepoint = self._get_codepoint()
+        self.codepoint = codepoint if codepoint else self._get_codepoint()
+        self.use_cff = use_cff
         self.name = self._get_name()
-        self.width = provider["glyph_height"]
-        self.height = provider["glyph_height"]
         self.svg_file = svg_file
         self.svg_path = None
-        self.use_cff = use_cff
+        self.width = provider["glyph_width"] if provider else BITMAP_GLYPH_SIZE
+        self.height = provider["glyph_height"] if provider else BITMAP_GLYPH_SIZE
         self.pen = self._new_pen()
+
+        if codepoint == 0x0000:
+            # Draw rectangle using the bounding box
+            self.pen.moveTo((NOTDEF_GLYPH[0], NOTDEF_GLYPH[1]))
+            self.pen.lineTo((NOTDEF_GLYPH[0], NOTDEF_GLYPH[3]))
+            self.pen.lineTo((NOTDEF_GLYPH[2], NOTDEF_GLYPH[3]))
+            self.pen.lineTo((NOTDEF_GLYPH[2], NOTDEF_GLYPH[1]))
+            self.pen.closePath()
 
     def draw(self):
         pen = self._new_pen()
@@ -167,7 +156,9 @@ class Glyph:
         # if existing_name:
         # return existing_name
 
-        if self.codepoint <= 0xFFFF:
+        if self.codepoint == 0x0000:
+            return NOTDEF
+        elif self.codepoint <= 0xFFFF:
             return f"uni{self.codepoint:04X}"
         else:
             return f"u{self.codepoint:06X}"

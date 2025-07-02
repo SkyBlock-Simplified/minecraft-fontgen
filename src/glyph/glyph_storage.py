@@ -44,7 +44,7 @@ class GlyphStorage:
                 table.cmap[glyph.codepoint] = name
 
     def add_notdef(self):
-        self.add(Glyph())
+        self.add(Glyph(None, 0x0000, self.use_cff))
 
     def get(self, pen):
         if self.use_cff:
@@ -57,7 +57,7 @@ class GlyphStorage:
         return glyph
 
     def new_glyph(self, unicode: str, svg_file, provider):
-        return Glyph(unicode, svg_file, provider, self.use_cff)
+        return Glyph(unicode, None, self.use_cff, svg_file, provider)
 
     def save(self, output_file):
         print(f"→ 💾 Saving font to '{output_file}'...")
