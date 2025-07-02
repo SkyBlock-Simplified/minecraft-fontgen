@@ -116,7 +116,19 @@ class GlyphStorage:
         else:
             return TTGlyphPen(None)
 
-    def save(self):
+    def save(self, output_file):
+        print(f"→ 💾 Saving font to '{output_file}'...")
+        #print_cff_debug_info(self.font)
+        self.font.save(output_file)
+
+    def sort(self):
+        # Create .notdef and add it to the front
+        notdef_glyph = self.make_notdef()
+        self.hmtx[NOTDEF] = (ADVANCE_WIDTH, BOUNDING_BOX[0])
+        self.glyphs.pop(NOTDEF, None)
+        self.glyphs = OrderedDict([(NOTDEF, notdef_glyph)] + list(self.glyphs.items()))
+
+    def write(self):
         # Set glyph order
         self.font.setGlyphOrder(list(self.glyphs.keys()))
 
@@ -136,9 +148,10 @@ class GlyphStorage:
         for table in self.tables:
             table.cmap[0x0000] = NOTDEF
 
-    def sort(self):
-        # Create .notdef and add it to the front
-        notdef_glyph = self.make_notdef()
-        self.hmtx[NOTDEF] = (ADVANCE_WIDTH, BOUNDING_BOX[0])
-        self.glyphs.pop(NOTDEF, None)
-        self.glyphs = OrderedDict([(NOTDEF, notdef_glyph)] + list(self.glyphs.items()))
+        # Set glyph metrics
+        total_glyphs = len(self.glyphs)
+        self.font["hmtx"].metrics = self.hmtx
+        self.font["hhea"].numberOfHMetrics = total_glyphs # Number of advanceWidth + leftSideBearing pairs in the hmtx table
+        self.font["maxp"].numGlyphs = total_glyphs # Total number of glyphs in the font
+        self.font["OS/2"].usFirstCharIndex = self.cpr[0] # First Unicode codepoint in the font
+        self.font["OS/2"].usLastCharIndex = self.cpr[1] # Last Unicode codepoint in the font
