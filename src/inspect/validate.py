@@ -43,8 +43,6 @@ else:
         if error_mask & bitmask:
             print(f"  → Code {bitmask}: {description}")
 
-sys.exit(0)
-
 print(" → 🔎 Inspecting individual glyphs...")
 bad_glyphs = []
 
