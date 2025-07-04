@@ -30,19 +30,6 @@ def create_ot_font_tables(font):
     top_dict.FontMatrix = [1 / UNITS_PER_EM, 0, 0, 1 / UNITS_PER_EM, 0, 0]
 
     # Rebuild CharStrings
-    # new_charstrings = CharStrings(
-    # None,
-    # top_dict,
-    # global_subrs,
-    # getattr(top_dict, "Private", None),
-    # getattr(top_dict, "FDSelect", None),
-    # getattr(top_dict, "FDArray", None),
-    # ordered_glyphs
-    # )
-    # new_charstrings.charStrings = dict(ordered_glyphs)
-    # new_charstrings.keys = list(ordered_glyphs.keys())
-    # top_dict.CharStrings = new_charstrings
-
     private = PrivateDict(None, None, 0)
     #private.defaultWidthX = ADVANCE_WIDTH
     #private.nominalWidthX = 0
