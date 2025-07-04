@@ -1,7 +1,7 @@
 from collections import OrderedDict
 
 from src.glyph.glyph import Glyph
-from src.util.constants import ADVANCE_WIDTH, BOUNDING_BOX, NOTDEF
+from src.util.constants import ADVANCE_WIDTH, BOUNDING_BOX, NOTDEF, BITMAP_GLYPH_SIZE
 
 class GlyphStorage:
     def __init__(self, font, use_cff: True):
@@ -44,7 +44,13 @@ class GlyphStorage:
                 table.cmap[glyph.codepoint] = name
 
     def add_notdef(self):
-        self.add(Glyph(None, 0x0000, self.use_cff))
+        self.add(Glyph({
+            "unicode": None,
+            "codepoint": 0x0000,
+            "size": (BITMAP_GLYPH_SIZE, BITMAP_GLYPH_SIZE),
+            "location": (0, 0),
+            "output": None
+        }, self.use_cff))
 
     def get(self, pen):
         if self.use_cff:
@@ -56,8 +62,8 @@ class GlyphStorage:
 
         return glyph
 
-    def new_glyph(self, unicode: str, svg_file, provider):
-        return Glyph(unicode, None, self.use_cff, svg_file, provider)
+    def new_glyph(self, tile):
+        return Glyph(tile, self.use_cff)
 
     def save(self, output_file):
         print(f"→ 💾 Saving font to '{output_file}'...")
