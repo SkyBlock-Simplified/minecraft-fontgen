@@ -4,7 +4,6 @@ from math import atan
 AUTHOR = "CraftedFury"
 FONT_NAME = "Minecraft"
 VERSION = "1.1.0"
-TABLE_VERSION = 0x00010000
 MAC_EPOCH = 2082844800 # FontTools requires seconds since 12:00 midnight, January 1, 1904 UTC
 
 # Glyph
