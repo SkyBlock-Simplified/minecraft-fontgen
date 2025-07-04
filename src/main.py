@@ -1,6 +1,6 @@
 from file_io import read_json_file, clean_output_dir
 from font_creator import create_font_file
-from src.util.config import OUTPUT_FILE_PATH, MINECRAFT_JAR_DEFAULT_JSON, OPENTYPE
+from src.util.config import OUTPUT_FILE, MINECRAFT_JAR_DEFAULT_JSON, OPENTYPE
 from src.inspect.inspect import inspect_font_file
 
 def main():
@@ -14,10 +14,10 @@ def main():
     glyph_storage = create_font_file(providers, OPENTYPE)
 
     # Save font file
-    glyph_storage.save(OUTPUT_FILE_PATH)
+    glyph_storage.save(OUTPUT_FILE)
 
     # Inspect font file
-    inspect_font_file(OUTPUT_FILE_PATH)
+    inspect_font_file(OUTPUT_FILE)
 
     print("✨ Done.")
 
