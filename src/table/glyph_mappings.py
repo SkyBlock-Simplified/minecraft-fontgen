@@ -19,7 +19,7 @@ def create_font_mapping_table(font):
         cmap.tables.append(cmap4)
 
     if CREATE_SMP:
-        print(" → ➕ Adding supplementary multilingual plane support (U+0000 - U+10FFFF)...")
+        print(" → ➕ Adding supplementary multilingual plane support (U+10000 - U+1FFFF)...")
         cmap12 = CmapSubtable.newSubtable(12)
         cmap12.platformID = 3 # Windows
         cmap12.platEncID = 10 # Unicode SMP (UCS-4)
