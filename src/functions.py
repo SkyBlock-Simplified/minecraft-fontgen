@@ -1,9 +1,10 @@
 import os
 import zipfile
 import requests
+
 from six import BytesIO
 
-from src.config import MOJANG_MANIFEST_URL, SNAPSHOTS
+from src.config import MOJANG_MANIFEST_URL
 
 def get_unicode_codepoint(unicode_char: str):
     try:
