@@ -5,9 +5,11 @@ AUTHOR = "CraftedFury"
 FONT_NAME = "Minecraft"
 VERSION = "1.1.0"
 MAC_EPOCH = 2082844800 # FontTools requires seconds since 12:00 midnight, January 1, 1904 UTC
-OPENTYPE = True
-CREATE_BMP = True
-CREATE_SMP = True
+OPENTYPE = True # False for TrueType
+CREATE_BMP = True # BMP (Format 4) (U+0000 - U+FFFF)
+CREATE_SMP = True # SMP (Format 12) (U+10000 - U+1FFFF)
+
+# === CONSTANTS / DO NOT EDIT ===
 
 # File Input/Output
 MOJANG_MANIFEST_URL = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
