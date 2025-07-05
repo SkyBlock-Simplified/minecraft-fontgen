@@ -1,12 +1,5 @@
 from fontTools.ttLib import TTFont
 
-def progress_bar(current: int, total: int, padding: int = 2, width: int = 40):
-    progress = current / total
-    filled = int(width * progress)
-    bar = '█' * filled + '-' * (width - filled)
-    left_pad = ' ' * padding
-    print(f"\r{left_pad}[{bar}] {current}/{total}", end='', flush=True)
-
 def get_unicode_codepoint(unicode_char: str):
     try:
         utf16 = unicode_char.encode("utf-16", "surrogatepass")

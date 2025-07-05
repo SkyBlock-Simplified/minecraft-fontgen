@@ -1,22 +1,114 @@
 import os
 import json
 import shutil
+import sys
+import numpy as np
 
+from collections import deque, defaultdict, Counter
+from tqdm import tqdm
 from PIL import Image
-from src.util.config import OUTPUT_PATH, MINECRAFT_JAR_FONT_DIR
+from src.util.config import OUTPUT_DIR, MINECRAFT_JAR_FONT_DIR
 from src.util.constants import BITMAP_COLUMNS, BITMAP_GLYPH_SIZE
-from src.util.functions import progress_bar, get_unicode_codepoint
+from src.util.functions import get_unicode_codepoint
+
+def convert_tile_into_svg(tile):
+    # Read image
+    tile_width, tile_height = tile["size"]
+
+    # Write <rect> elements left-aligned
+    svg_rects = [
+        f'<rect x="{x}" y="{y}" width="1" height="1" />'
+        for y, x in tile["pixels"]["coords"]
+    ]
+
+    # TODO: BOLD AND ITALIC
+    #transform = f"matrix(1,0,{ITALIC_SHEAR_FACTOR},1,0,0)"
+
+    tile["svg"] = f'''<?xml version="1.0" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 {tile_width} {tile_height}" shape-rendering="crispEdges">
+    <g fill="black">
+        {''.join(svg_rects)}
+    </g>
+</svg>
+'''
+
+    # Save file
+    tile["svg_file"] = f"{tile['output']}/regular.svg"
+    with open(tile["svg_file"], "w", encoding="utf-8") as f:
+        f.write(tile["svg"])
+
+def convert_tile_into_pixels(tile):
+    # Convert image to pixels
+    bitmap_grid = np.array(tile["bitmap"].convert("L"), dtype=int) # White (255) / Black (0)
+    bitmap_grid = (bitmap_grid < 128).astype(np.uint8) # White (0) / Black (1)
+    height, width = bitmap_grid.shape
+
+    # Create pixel grid
+    pixel_grid = np.zeros((height, width), dtype=int)
+
+    # Replace exterior zeros with twos
+    q = deque()
+    for x in range(width):
+        if bitmap_grid[0, x] == 0: q.append((0, x))
+        if bitmap_grid[height - 1, x] == 0: q.append((height - 1, x))
+    for y in range(height):
+        if bitmap_grid[y, 0] == 0: q.append((y, 0))
+        if bitmap_grid[y, width - 1] == 0: q.append((y, width - 1))
+    while q:
+        y, x = q.popleft()
+        if 0 <= y < height and 0 <= x < width:
+            if bitmap_grid[y, x] == 0 and pixel_grid[y, x] == 0:
+                pixel_grid[y, x] = 2
+                q.extend([(y + 1, x), (y - 1, x), (y, x + 1), (y, x - 1)])
+
+    # Label interior hole pixels with unique number
+    hole_labels = []
+    next_hole = 3
+    for y in range(height):
+        for x in range(width):
+            if bitmap_grid[y, x] == 0 and pixel_grid[y, x] == 0:
+                # Found new hole
+                q = deque()
+                hole_labels.append(next_hole)
+                q.append((y, x))
+                pixel_grid[y, x] = next_hole
+
+                while q:
+                    cy, cx = q.popleft()
+
+                    for dy, dx in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                        ny, nx = cy + dy, cx + dx
+
+                        if height > ny >= 0 == bitmap_grid[ny, nx] and width > nx >= 0 == pixel_grid[ny, nx]:
+                            pixel_grid[ny, nx] = next_hole
+                            q.append((ny, nx))
+
+                next_hole += 1
+
+    tile["pixels"] = {
+        "grid": pixel_grid,
+        "holes": hole_labels,
+        "coords": [(x, y) for y, x in np.argwhere(pixel_grid == 0)]
+    }
+
+def crop_tile_from_bitmap(bitmap, tile):
+    # Crop tile from bitmap
+    x, y = tile["location"]
+    width, height = tile["size"]
+    px, py = (x * width, y * height)
+    tile["bitmap"] = bitmap.crop((px, py, px + width, py + height))
+
+    # Save tile
+    tile["bmp_file"] = f"{tile['output']}/glyph.bmp"
+    os.makedirs(tile["output"], exist_ok=True)
+    tile["bitmap"].save(tile["bmp_file"])
 
 def read_provider_bitmap(provider):
-    print(f"→ 🖼️ Reading '{provider['file_name']}'...")
     img = Image.open(provider["file_path"]).convert("RGBA")
-    width, height = img.size
-    bmp_tiles = []
 
-    print(f"→ 🏁 Converting to grayscale...")
     # Composite white glyphs over black background
     bg = Image.new("RGBA", img.size, (0, 0, 0, 255)) # Black background
-    img = Image.alpha_composite(bg, img).convert("L") # Grayscale
+    img = Image.alpha_composite(bg, img).convert("L") # 1-bit grayscale
 
     # Invert white glyphs to black
     img = Image.eval(img, lambda x: 255 - x)
@@ -31,97 +123,54 @@ def read_provider_bitmap(provider):
 
     return img
 
-def slice_bitmap_into_bmp(provider):
-    # Image and glyph dimensions
-    image = provider["image"]
-    width, height = image.size
-    glyph_width = provider["glyph_width"]
-    glyph_height = provider["glyph_height"]
-    bmp_tiles = []
+def slice_providers_into_tiles(providers):
+    print(f"✂️ Slicing bitmap providers into tiles...")
 
-    print(f"→ 🧩 Creating BMP tiles...")
-    for idx, y in enumerate(range(0, height, glyph_height)):
-        for x in range(0, width, glyph_width):
-            tile_row = y // glyph_width
-            tile_column = x // glyph_height
-            index = idx * BITMAP_COLUMNS + (tile_column)
-            tile = image.crop((x, y, x + glyph_width, y + glyph_height))
+    for provider in providers:
+        print(f"→ 🖼️ Reading '{provider['file_name']}'...")
 
-            # Skip tiles without corresponding Unicode entry
-            if index >= len(provider["chars"]):
-                print(f" → ⚠️ Failed to load glyph {index}@{tile_row},{tile_column}.")
-                continue
+        #if provider["name"] != "ascii": # TODO: TEMPORARY
+        #    continue
 
-            # Load glyph
-            codepoint = get_unicode_codepoint(provider["chars"][index])
-            tile_dir = f"{provider['tile_output']}/{tile_row:02}_{tile_column:02}_{codepoint:04X}"
-            tile_path = f"{tile_dir}/glyph.bmp"
+        bitmap = read_provider_bitmap(provider)
+        tiles = []
 
-            # Create tile directory
-            os.makedirs(tile_dir, exist_ok=True)
+        with tqdm(enumerate(provider["chars"]), total=len(provider["chars"]),
+                  desc=" → 🔣 Tiles", unit="tile",
+                  ncols=80, leave=False, file=sys.stdout) as tiles_progress:
+            for i, unicode in tiles_progress:
+                # Skip .notdef
+                codepoint = get_unicode_codepoint(unicode)
+                if codepoint == 0x0000:
+                    continue
 
-            # Save tile
-            tile.save(tile_path)
-            bmp_tiles.append(tile_path)
+                # Update progress bar
+                tiles_progress.set_description(f" → 🔣 0x{codepoint:02X}")
 
-    return bmp_tiles
+                # Collate tile data
+                tile_row = i // BITMAP_COLUMNS
+                tile_column = i % BITMAP_COLUMNS
+                tile = {
+                    "unicode": unicode,
+                    "codepoint": codepoint,
+                    "size": (BITMAP_GLYPH_SIZE, provider.get("height") or BITMAP_GLYPH_SIZE),
+                    "location": (tile_column, tile_row),
+                    "output": f"{provider['output']}/tiles/{tile_row:02}_{tile_column:02}_{codepoint:04X}"
+                }
+                tiles.append(tile)
 
-def convert_bmp_into_svg(provider):
-    print("→ ✒️ Creating SVG files...")
-    svg_files = []
-    total_chars = len(provider["chars"])
-    index = 0
+                # Crop tile from bitmap
+                crop_tile_from_bitmap(bitmap, tile)
 
-    for bmp_path in provider["bmp_tiles"][:total_chars]:
-        # Show progress bar
-        progress_bar(index, total_chars)
-        index += 1
+                # Create pixel grid and collect hole data
+                convert_tile_into_pixels(tile)
 
-        # Read image
-        img = Image.open(bmp_path).convert("1") # Ensure 1-bit black/white
-        width, height = img.size
-        glyph_width = provider["glyph_width"]
-        glyph_height = provider["glyph_height"]
-        svg_elements = []
+                # Create svg files
+                convert_tile_into_svg(tile)
 
-        # Collect black pixels
-        black_pixels = [
-            (x, y)
-            for y in range(height)
-            for x in range(width)
-            if img.getpixel((x, y)) == 0
-        ]
+            provider["tiles"] = tiles
 
-        # Write <rect> elements left-aligned
-        for x, y in black_pixels:
-            #sheared_x = x + ITALIC_SHEAR_FACTOR * y
-            svg_elements.append(f'<rect x="{x}" y="{y}" width="1" height="1" />')
-            #svg_elements.append(f'<rect x="{x+1}" y="{y}" width="1" height="1" />')
-
-        # TODO: ITALIC TRANSFORMATION
-        #transform = f"matrix(1,0,{ITALIC_SHEAR_FACTOR},1,0,0)"
-        svg_content = f'''<?xml version="1.0" standalone="no"?>
-    <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 {glyph_width} {glyph_height}" shape-rendering="crispEdges">
-        <g fill="black">
-            {''.join(svg_elements)}
-        </g>
-    </svg>
-    '''
-
-        # Save file
-        svg_file = os.path.dirname(bmp_path) + "/regular.svg" # TODO: BOLD AND ITALIC
-        with open(svg_file, "w", encoding="utf-8") as f:
-            f.write(svg_content)
-
-        svg_files.append(svg_file)
-
-    # Finish the progress bar
-    progress_bar(total_chars, total_chars)
-    print()
-
-    return svg_files
-
-def read_json_file(json_file):
+def read_providers_from_json_file(json_file):
     print(f"🧩 Parsing '{json_file}'...")
 
     with open(json_file, "rb") as f:
@@ -138,37 +187,27 @@ def read_json_file(json_file):
         if provider.get("type") == "bitmap" and "chars" in provider:
             file_name = provider.get("file", "minecraft:font/").split("minecraft:font/")[-1]
             name = os.path.splitext(file_name)[0]
-            output = OUTPUT_PATH + "/" + name
+            output = OUTPUT_DIR + "/" + name
+
+            # Create provider directory
+            os.makedirs(output, exist_ok=True)
 
             # Read unicode characters
-            flat_chars = [char for row in provider.get("chars", []) for char in row]
-            print(f" → 🔢 Detected {len(flat_chars)} unicode characters in '{name}'...")
+            chars = [char for row in provider.get("chars", []) for char in row]
+            print(f" → 🔢 Detected {len(chars)} unicode characters in '{name}'...")
 
-            entry = {
-                "chars": flat_chars,
+            providers.append({
                 "ascent": provider.get("ascent") or 0,
-                "glyph_height": provider.get("height") or BITMAP_GLYPH_SIZE,
-                "glyph_width": BITMAP_GLYPH_SIZE,
-                "name": name,
+                "chars": chars,
                 "file_name": file_name,
-                "file_path": MINECRAFT_JAR_FONT_DIR + file_name,
-                "output": output,
-                "tile_output": output + "/" + "tiles"
-            }
-
-            # Create output directory
-            os.makedirs(entry["tile_output"], exist_ok=True)
-            providers.append(entry)
-
-    print(f"✂️ Slicing bitmap providers into tiles...")
-    for provider in providers:
-        provider["image"] = read_provider_bitmap(provider)
-        provider["bmp_tiles"] = slice_bitmap_into_bmp(provider)
-        provider["svg_files"] = convert_bmp_into_svg(provider)
+                "file_path": MINECRAFT_JAR_FONT_DIR + "/" + file_name,
+                "name": name,
+                "output": output
+            })
 
     return providers
 
 def clean_output_dir():
     print("🧹 Cleaning output directory...")
-    shutil.rmtree(OUTPUT_PATH, ignore_errors=True)
-    os.makedirs(OUTPUT_PATH, exist_ok=True)
+    shutil.rmtree(OUTPUT_DIR, ignore_errors=True)
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
