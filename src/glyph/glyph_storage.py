@@ -1,5 +1,7 @@
 from collections import OrderedDict
 
+from fontTools.ttLib.standardGlyphOrder import standardGlyphOrder
+
 from src.glyph.glyph import Glyph
 from src.util.constants import ADVANCE_WIDTH, BOUNDING_BOX, NOTDEF, DEFAULT_GLYPH_SIZE
 
@@ -40,7 +42,7 @@ class GlyphStorage:
         for table in self.tables:
             if table.format == 4 and glyph.codepoint <= 0xFFFF: # Format 4 (BMP Codepoints)
                 table.cmap[glyph.codepoint] = name
-            elif table.format == 12 and glyph.codepoint > 0xFFFFFF: # Format 12 (SMP Codepoints)
+            elif table.format == 12: # Format 12 (SMP Codepoints)
                 table.cmap[glyph.codepoint] = name
 
     def add_notdef(self):
@@ -87,10 +89,6 @@ class GlyphStorage:
 
             for name, glyph in self.glyphs.items():
                 self.glyf.glyphs[name] = glyph
-
-        # Ensure .notdef is assigned to index 0
-        #for table in self.tables:
-        #    table.cmap[0x0000] = NOTDEF
 
         # Set glyph metrics
         total_glyphs = len(self.glyphs)
