@@ -16,6 +16,8 @@ OUTPUT_DIR = "output"
 OUTPUT_FONT_FILE = f"{OUTPUT_DIR}/{FONT_NAME}" + (".otf" if OPENTYPE else ".ttf")
 MOJANG_MANIFEST_URL = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
 MINECRAFT_JAR_DIR = OUTPUT_DIR + "/assets/minecraft"
+MINECRAFT_BIN_FILE = f"{MINECRAFT_JAR_DIR}/font/glyph_sizes.bin"
+MINECRAFT_JSON_FILE = f"{MINECRAFT_JAR_DIR}/font/include/default.json"
 
 # Glyph
 COLUMNS_PER_ROW = 16
