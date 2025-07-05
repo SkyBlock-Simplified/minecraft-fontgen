@@ -8,23 +8,21 @@ def create_font_mapping_table(font):
     cmap.tableVersion = 0
     cmap.tables = []
 
+    def new_table(format, platform, encoding):
+        table = CmapSubtable.newSubtable(format)
+        table.platformID = platform # Windows = 3
+        table.platEncID = encoding # Unicode UCS (BMP = UCS-2, SMP = UCS-4)
+        table.language = 0
+        table.cmap = {}
+        return table
+
     if CREATE_BMP:
         print(" → ➕ Adding BMP (Format 4) support (U+0000 - U+FFFF)...")
-        cmap4 = CmapSubtable.newSubtable(4)
-        cmap4.platformID = 3 # Windows
-        cmap4.platEncID = 1 # Unicode BMP (UCS-2)
-        cmap4.language = 0
-        cmap4.cmap = {}
-        cmap.tables.append(cmap4)
+        cmap.tables.append(new_table(4, 3, 1))
 
     if CREATE_SMP:
         print(" → ➕ Adding SMP (Format 12) support (U+10000 - U+1FFFF)...")
-        cmap12 = CmapSubtable.newSubtable(12)
-        cmap12.platformID = 3 # Windows
-        cmap12.platEncID = 10 # Unicode SMP (UCS-4)
-        cmap12.language = 0
-        cmap12.cmap = {}
-        cmap.tables.append(cmap12)
+        cmap.tables.append(new_table(12, 3, 10))
 
     if len(cmap.tables) == 0:
         raise ValueError("You need at least 1 subtable type enabled.")
