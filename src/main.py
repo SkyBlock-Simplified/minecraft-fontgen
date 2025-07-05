@@ -1,6 +1,6 @@
 from file_io import read_providers_from_json_file, clean_output_dir, slice_providers_into_tiles
 from font_creator import create_font_file
-from src.util.config import OUTPUT_FILE, MINECRAFT_JAR_DEFAULT_JSON, OPENTYPE
+from src.config import OUTPUT_FILE, MINECRAFT_JAR_DEFAULT_JSON, OPENTYPE
 from src.inspect.inspect import inspect_font_file
 
 def main():

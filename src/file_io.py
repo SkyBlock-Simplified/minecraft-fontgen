@@ -4,10 +4,10 @@ import shutil
 import sys
 import numpy as np
 
-from collections import deque, Counter
+from collections import deque
 from tqdm import tqdm
 from PIL import Image
-from src.util.config import OUTPUT_DIR, MINECRAFT_JAR_FONT_DIR
+from src.config import OUTPUT_DIR, MINECRAFT_JAR_FONT_DIR
 from src.util.constants import BITMAP_COLUMNS, BITMAP_GLYPH_SIZE
 from src.util.functions import get_unicode_codepoint
 
