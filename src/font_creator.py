@@ -1,4 +1,7 @@
+import sys
+
 from fontTools.ttLib import TTFont
+from tqdm import tqdm
 
 from src.glyph.glyph_storage import GlyphStorage
 from src.table.glyph_mappings import create_font_mapping_table
@@ -11,41 +14,34 @@ from src.table.opentype import create_ot_font_tables
 from src.table.os2_metrics import create_font_metrics_table
 from src.table.postscript import create_font_pscript_table
 from src.table.truetype import create_tt_font_tables
-from src.util.functions import progress_bar
 
 def convert_unicode_to_glyphs(providers, glyph_storage):
-    total_chars = sum(len(provider["chars"]) for provider in providers)
-    print(f"→ 🔣 Converting {total_chars} unicode to glyphs...")
-    index = 0
+    total_tiles = sum(len(provider["tiles"]) for provider in providers)
+    print(f"→ 🔣 Converting {total_tiles} unicode to glyphs...")
 
     for provider in providers:
-        for unicode_char, svg_file in zip(provider["chars"], provider["svg_files"]):
-            # Show progress bar
-            progress_bar(index, total_chars)
-            index += 1
+        with tqdm(provider["tiles"], total=len(provider["chars"]),
+                  desc=" → 🔣 Tiles", unit="tile",
+                  ncols=80, leave=False, file=sys.stdout) as tiles_progress:
+            for tile in tiles_progress:
+                # Create new glyph
+                glyph = glyph_storage.new_glyph(tile)
 
-            # Create new glyph
-            glyph = glyph_storage.new_glyph(unicode_char, svg_file, provider)
+                # Skip invalid and .notdef characters
+                if not glyph.valid():
+                    continue
 
-            # Skip invalid and .notdef characters
-            if not glyph.valid():
-                continue
+                # Export svg path
+                glyph.write_svg_paths("paths")
 
-            # Read svg path
-            glyph.read_path()
+                # Scale svg
+                glyph.scale()
 
-            # Scale svg
-            glyph.scale()
+                # Draw svg
+                glyph.draw()
 
-            # Draw svg
-            glyph.draw()
-
-            # Save glyph
-            glyph_storage.add(glyph)
-
-    # Finish the progress bar
-    progress_bar(total_chars, total_chars)
-    print()
+                # Save glyph
+                glyph_storage.add(glyph)
 
 def create_font_file(providers, use_cff: bool = True):
     font_icon = "🅾️" if use_cff else "🆎"
