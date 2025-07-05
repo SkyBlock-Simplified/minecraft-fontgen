@@ -1,7 +1,7 @@
 import time
 
 from fontTools.ttLib import newTable
-from src.util.constants import UNITS_PER_EM, BOUNDING_BOX, BITMAP_GLYPH_SIZE, MAC_EPOCH
+from src.util.constants import UNITS_PER_EM, BOUNDING_BOX, DEFAULT_GLYPH_SIZE, MAC_EPOCH
 
 def create_font_header_table(font, use_cff: bool = True):
     print("→ 📄 Generating header table...")
@@ -14,7 +14,7 @@ def create_font_header_table(font, use_cff: bool = True):
     head.fontDirectionHint = 2 # Used by font renderers for direction hints (usually set to 2 for modern fonts)
     head.glyphDataFormat = 0
     head.indexToLocFormat = 0 if not use_cff else 1 # 0 = short offsets (16-bit), 1 = long offsets (32-bit) in the loca table
-    head.lowestRecPPEM = BITMAP_GLYPH_SIZE # Smallest readable pixel size the font is designed for (in pixels per em)
+    head.lowestRecPPEM = DEFAULT_GLYPH_SIZE # Smallest readable pixel size the font is designed for (in pixels per em)
     head.macStyle = 0 # Bit flags for font styling (e.g., bold, italic)
     head.magicNumber = 0x5F0F3CF5 # Verification signature for OpenType and TrueType
     head.modified = now + (MAC_EPOCH - int(time.mktime(time.gmtime(0)))) # Last modified timestamp of the font

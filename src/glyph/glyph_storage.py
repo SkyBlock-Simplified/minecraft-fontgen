@@ -1,7 +1,7 @@
 from collections import OrderedDict
 
 from src.glyph.glyph import Glyph
-from src.util.constants import ADVANCE_WIDTH, BOUNDING_BOX, NOTDEF, BITMAP_GLYPH_SIZE
+from src.util.constants import ADVANCE_WIDTH, BOUNDING_BOX, NOTDEF, DEFAULT_GLYPH_SIZE
 
 class GlyphStorage:
     def __init__(self, font, use_cff: True):
@@ -47,7 +47,7 @@ class GlyphStorage:
         self.add(Glyph({
             "unicode": None,
             "codepoint": 0x0000,
-            "size": (BITMAP_GLYPH_SIZE, BITMAP_GLYPH_SIZE),
+            "size": (DEFAULT_GLYPH_SIZE, DEFAULT_GLYPH_SIZE),
             "location": (0, 0),
             "output": None
         }, self.use_cff))

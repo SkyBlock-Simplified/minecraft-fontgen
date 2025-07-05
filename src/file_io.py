@@ -8,7 +8,7 @@ from collections import deque
 from tqdm import tqdm
 from PIL import Image
 from src.config import OUTPUT_DIR, MINECRAFT_JAR_FONT_DIR
-from src.util.constants import BITMAP_COLUMNS, BITMAP_GLYPH_SIZE
+from src.util.constants import COLUMNS_PER_ROW, DEFAULT_GLYPH_SIZE
 from src.util.functions import get_unicode_codepoint
 
 def convert_tile_into_svg(tile):
@@ -234,7 +234,7 @@ def slice_providers_into_tiles(providers):
 
         # Calculate tile dimensions
         width, height = bitmap.size
-        glyph_width = width / BITMAP_COLUMNS
+        glyph_width = width / COLUMNS_PER_ROW
 
         with tqdm(enumerate(provider["chars"]), total=len(provider["chars"]),
                   desc=" → 🔣 Tiles", unit="tile",
@@ -249,8 +249,8 @@ def slice_providers_into_tiles(providers):
                 tiles_progress.set_description(f" → 🔣 0x{codepoint:02X}")
 
                 # Collate tile data
-                tile_row = i // BITMAP_COLUMNS
-                tile_column = i % BITMAP_COLUMNS
+                tile_row = i // COLUMNS_PER_ROW
+                tile_column = i % COLUMNS_PER_ROW
                 tile = {
                     "unicode": unicode,
                     "codepoint": codepoint,
@@ -300,7 +300,7 @@ def read_providers_from_json_file(json_file):
 
             providers.append({
                 "ascent": provider.get("ascent", 0),
-                "height": provider.get("height", BITMAP_GLYPH_SIZE),
+                "height": provider.get("height", DEFAULT_GLYPH_SIZE),
                 "chars": chars,
                 "file_name": file_name,
                 "file_path": MINECRAFT_JAR_FONT_DIR + "/" + file_name,

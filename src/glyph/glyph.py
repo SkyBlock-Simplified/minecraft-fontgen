@@ -4,7 +4,7 @@ from collections import defaultdict, deque, Counter
 from fontTools.pens.t2CharStringPen import T2CharStringPen
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 
-from src.util.constants import UNITS_PER_EM, BITMAP_GLYPH_SIZE, NOTDEF, NOTDEF_GLYPH, BOUNDING_BOX
+from src.util.constants import UNITS_PER_EM, DEFAULT_GLYPH_SIZE, NOTDEF, NOTDEF_GLYPH, BOUNDING_BOX
 from src.util.functions import get_unicode_codepoint
 
 class Glyph:
@@ -14,7 +14,7 @@ class Glyph:
         self.use_cff = use_cff
         self.name = self._get_name()
         self.svg_file = tile["svg_file"] if "svg_file" in tile else None
-        self.size = tile["size"] or (BITMAP_GLYPH_SIZE, BITMAP_GLYPH_SIZE)
+        self.size = tile["size"] or (DEFAULT_GLYPH_SIZE, DEFAULT_GLYPH_SIZE)
         self.ascent = tile["ascent"] if "ascent" in tile else 0
         self.pen = self._new_pen()
 
@@ -83,8 +83,8 @@ class Glyph:
         max_y = max(y for x, y in all_points)
 
         #width, height = self.size
-        scale_x = UNITS_PER_EM / BITMAP_GLYPH_SIZE
-        scale_y = UNITS_PER_EM / BITMAP_GLYPH_SIZE
+        scale_x = UNITS_PER_EM / DEFAULT_GLYPH_SIZE
+        scale_y = UNITS_PER_EM / DEFAULT_GLYPH_SIZE
         #baseline_offset = self.ascent - height + 1
         baseline_offset = 0
 
