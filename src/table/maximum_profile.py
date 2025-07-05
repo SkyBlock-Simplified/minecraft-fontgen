@@ -1,6 +1,6 @@
 from fontTools.ttLib import newTable
 
-from src.util.constants import DEFAULT_GLYPH_SIZE
+from src.config import DEFAULT_GLYPH_SIZE
 
 def create_font_mprofile_table(font, use_cff: bool = True):
     print("→ 📄 Generating maximum profile table...")

@@ -1,9 +1,7 @@
 from collections import OrderedDict
 
-from fontTools.ttLib.standardGlyphOrder import standardGlyphOrder
-
 from src.glyph.glyph import Glyph
-from src.util.constants import ADVANCE_WIDTH, BOUNDING_BOX, NOTDEF, DEFAULT_GLYPH_SIZE
+from src.config import ADVANCE_WIDTH, BOUNDING_BOX, NOTDEF, DEFAULT_GLYPH_SIZE
 
 class GlyphStorage:
     def __init__(self, font, use_cff: True):
@@ -40,9 +38,9 @@ class GlyphStorage:
 
         # Add to glyph mapping
         for table in self.tables:
-            if table.format == 4 and glyph.codepoint <= 0xFFFF: # Format 4 (BMP Codepoints)
+            if table.format == 4 and glyph.codepoint <= 0xFFFF: # BMP (U+0000 - U+FFFF)
                 table.cmap[glyph.codepoint] = name
-            elif table.format == 12: # Format 12 (SMP Codepoints)
+            elif table.format == 12: # SMP (U+10000 - U+1FFFF)
                 table.cmap[glyph.codepoint] = name
 
     def add_notdef(self):

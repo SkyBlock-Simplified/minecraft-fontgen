@@ -1,6 +1,7 @@
 from fontTools.ttLib import newTable
 from fontTools.ttLib.tables.O_S_2f_2 import Panose
-from src.util.constants import ASCENT, DESCENT
+
+from src.config import ASCENT, DESCENT
 
 def create_font_metrics_table(font):
     print("→ 📄 Generating metrics table...")

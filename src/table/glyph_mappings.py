@@ -2,7 +2,6 @@ from fontTools.ttLib import newTable
 from fontTools.ttLib.tables._c_m_a_p import CmapSubtable
 from src.config import CREATE_SMP, CREATE_BMP
 
-
 def create_font_mapping_table(font):
     print("→ 📄 Generating glyph mappings...")
     cmap = font["cmap"] = newTable("cmap")

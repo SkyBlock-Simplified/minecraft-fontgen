@@ -1,11 +1,11 @@
 import os
 
-from collections import defaultdict, deque, Counter
+from collections import defaultdict
 from fontTools.pens.t2CharStringPen import T2CharStringPen
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 
-from src.util.constants import UNITS_PER_EM, DEFAULT_GLYPH_SIZE, NOTDEF, NOTDEF_GLYPH, BOUNDING_BOX
-from src.util.functions import get_unicode_codepoint
+from src.config import UNITS_PER_EM, DEFAULT_GLYPH_SIZE, NOTDEF, NOTDEF_GLYPH
+from src.functions import get_unicode_codepoint
 
 class Glyph:
     def __init__(self, tile, use_cff: bool = True):

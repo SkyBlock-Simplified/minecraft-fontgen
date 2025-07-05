@@ -1,5 +1,6 @@
 from setuptools import setup, find_packages
-from src.util.constants import AUTHOR, VERSION
+
+from src.config import AUTHOR, VERSION
 
 setup(
     name="minecraft-fontgen",

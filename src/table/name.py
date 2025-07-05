@@ -1,8 +1,7 @@
 from fontTools.ttLib import newTable
 from fontTools.ttLib.tables._n_a_m_e import makeName
 
-from src.util.constants import FONT_NAME, VERSION
-
+from src.config import FONT_NAME, VERSION
 
 def create_font_name_table(font):
     print("→ 📄 Generating name table...")

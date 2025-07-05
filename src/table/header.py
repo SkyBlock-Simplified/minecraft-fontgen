@@ -1,7 +1,7 @@
 import time
 
 from fontTools.ttLib import newTable
-from src.util.constants import UNITS_PER_EM, BOUNDING_BOX, DEFAULT_GLYPH_SIZE, MAC_EPOCH
+from src.config import UNITS_PER_EM, BOUNDING_BOX, DEFAULT_GLYPH_SIZE, MAC_EPOCH
 
 def create_font_header_table(font, use_cff: bool = True):
     print("→ 📄 Generating header table...")

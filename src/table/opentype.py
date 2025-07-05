@@ -3,10 +3,8 @@ from fontTools.cffLib import (
     CFFFontSet, TopDict, TopDictIndex, Index,
     PrivateDict, FontDict, FDSelect, CharStrings
 )
-from src.util.constants import (
-    FONT_NAME, VERSION, AUTHOR,
-    BOUNDING_BOX, UNITS_PER_EM
-)
+
+from src.config import FONT_NAME, VERSION, AUTHOR, BOUNDING_BOX, UNITS_PER_EM
 
 def create_ot_font_tables(font):
     print("→ 📄 Creating opentype table...")

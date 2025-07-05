@@ -1,8 +1,6 @@
 from fontTools.ttLib import newTable
 
-from src.util.constants import (
-    ASCENT, DESCENT, ADVANCE_WIDTH, BOUNDING_BOX
-)
+from src.config import ASCENT, DESCENT, ADVANCE_WIDTH, BOUNDING_BOX
 
 def create_font_hheader_table(font, use_cff: bool = True):
     print("→ 📄 Generating horizontal header table...")
