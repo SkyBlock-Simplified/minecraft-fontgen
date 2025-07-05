@@ -1,26 +1,31 @@
-from xml.etree import ElementTree
+import os
 
-from PIL.ImagePath import Path
+from collections import defaultdict, deque, Counter
 from fontTools.pens.t2CharStringPen import T2CharStringPen
 from fontTools.pens.ttGlyphPen import TTGlyphPen
-from svgpathtools import Line
 
-from src.util.constants import UNITS_PER_EM, BITMAP_GLYPH_SIZE, NOTDEF, NOTDEF_GLYPH
+from src.util.constants import UNITS_PER_EM, BITMAP_GLYPH_SIZE, NOTDEF, NOTDEF_GLYPH, BOUNDING_BOX
 from src.util.functions import get_unicode_codepoint
 
 class Glyph:
-    def __init__(self, unicode, codepoint: int = None, use_cff: bool = True, svg_file: str = None, provider = None):
-        self.unicode = unicode
-        self.codepoint = codepoint if codepoint else self._get_codepoint()
+    def __init__(self, tile, use_cff: bool = True):
+        self.unicode = tile["unicode"]
+        self.codepoint = self._get_codepoint() if "codepoint" not in tile else tile["codepoint"]
         self.use_cff = use_cff
         self.name = self._get_name()
-        self.svg_file = svg_file
-        self.svg_path = None
-        self.width = provider["glyph_width"] if provider else BITMAP_GLYPH_SIZE
-        self.height = provider["glyph_height"] if provider else BITMAP_GLYPH_SIZE
+        self.svg_file = tile["svg_file"] if "svg_file" in tile else None
+        self.size = tile["size"] or (BITMAP_GLYPH_SIZE, BITMAP_GLYPH_SIZE)
+        self.ascent = tile["ascent"] if "ascent" in tile else 0
         self.pen = self._new_pen()
 
-        if codepoint == 0x0000:
+        # Pixels
+        self.pixels = tile["pixels"] if "pixels" in tile else []
+        self.outer = self.pixels["paths"] if "paths" in self.pixels else {}
+        self.holes = self.pixels["holes"] if "holes" in self.pixels else {}
+        self.outer_scaled = {}
+        self.holes_scaled = {}
+
+        if self.codepoint == 0x0000:
             # Draw rectangle using the bounding box
             self.pen.moveTo((NOTDEF_GLYPH[0], NOTDEF_GLYPH[1]))
             self.pen.lineTo((NOTDEF_GLYPH[0], NOTDEF_GLYPH[3]))
@@ -29,54 +34,28 @@ class Glyph:
             self.pen.closePath()
 
     def draw(self):
-        pen = self._new_pen()
+        """
+        Draws the outer contour and holes (as counter-clockwise subpaths) to a fontTools pen.
+        Assumes:
+            - self.corners contains the clockwise outer contour (list of (x, y) tuples)
+            - self.holes is a dict with keys -> {'corners': [...]} representing holes
+        """
+        pen = self.pen
 
-        # Draw an empty contour for blank glyphs
-        if not self.svg_path:
-            pen.moveTo((0, 0))
-            pen.endPath()
-            self.pen = pen
-            return
-
-        segments = list(self.svg_path.continuous_subpaths())
-
-        for subpath in segments:
-            if not subpath:
-                continue
-
-            current_pos = None
-            for segment in subpath:
-                start = (segment.start.real, segment.start.imag)
-                end = (segment.end.real, segment.end.imag)
-
-                if current_pos != start:
-                    pen.moveTo(start)
-
-                if segment.__class__.__name__ == 'Line':
-                    pen.lineTo(end)
-                elif segment.__class__.__name__ == 'CubicBezier':
-                    pen.curveTo(
-                        (segment.control1.real, segment.control1.imag),
-                        (segment.control2.real, segment.control2.imag),
-                        end
-                    )
-                elif segment.__class__.__name__ == 'QuadraticBezier':
-                    pen.qCurveTo(
-                        (segment.control.real, segment.control.imag),
-                        end
-                    )
-                else:
-                    pen.lineTo(end)
-
-                current_pos = end
-
-            # Ensure path is closed
-            if abs(subpath[0].start - subpath[-1].end) < 1e-3:
+        def draw_contour(path):
+            if len(path) >= 3:
+                pen.moveTo(path[0])
+                for pt in path[1:]:
+                    pen.lineTo(pt)
                 pen.closePath()
-            else:
-                pen.endPath()
 
-        self.pen = pen
+        # Draw outer shape (must be clockwise)
+        for outer_path in self.outer_scaled:
+            draw_contour(outer_path)
+
+        # Draw holes (must be counter-clockwise)
+        for hole_path in self.holes_scaled:
+            draw_contour(list(reversed(hole_path)))
 
     def get(self):
         if self.use_cff:
@@ -86,54 +65,35 @@ class Glyph:
 
         return glyph
 
-    def read_path(self):
-        tree = ElementTree.parse(self.svg_file)
-        root = tree.getroot()
-        path = Path()
-
-        for rect in root.iter('{http://www.w3.org/2000/svg}rect'):
-            x = float(rect.attrib.get('x', 0))
-            y = float(rect.attrib.get('y', 0))
-            w = float(rect.attrib.get('width', 1))
-            h = float(rect.attrib.get('height', 1))
-
-            # Create square as 4 lines (clockwise)
-            p1 = complex(x, y)
-            p2 = complex(x + w, y)
-            p3 = complex(x + w, y + h)
-            p4 = complex(x, y + h)
-
-            # Add closed square as 4 lines + close
-            square = Path(
-                Line(p1, p2),
-                Line(p2, p3),
-                Line(p3, p4),
-                Line(p4, p1) # Close loop
-            )
-
-            path.extend(square)
-
-        self.svg_path = path
+    def cpt(self):
+        return self.codepoint in [0x0034, 0x0038, 0x0051, 0x0041, 0x00C0, 0x00CA]
 
     def scale(self):
-        if len(self.svg_path) == 0:
+        if not self.pixels:
             return
 
-        # Copy original
-        path = Path(*self.svg_path)
+        if not self.pixels or all(len(p.get("corners", [])) < 3 for p in self.outer.values()):
+            return
 
-        # Align left edge
-        min_x = min(seg.start.real for seg in path)
-        path = path.translated(complex(-min_x, 0))
+        outer_paths = [p["corners"] for p in self.outer.values() if len(p.get("corners", [])) >= 3]
+        hole_paths = [h["corners"] for h in self.holes.values() if len(h.get("corners", [])) >= 3]
 
-        # Align bottom (to 0), flip Y
-        path = path.translated(complex(0, -self.height + 1))
+        all_points = [pt for path in outer_paths + hole_paths for pt in path]
+        min_x = min(x for x, y in all_points)
+        max_y = max(y for x, y in all_points)
 
-        # Scale path from bitmap size (8px) to font units
-        scale = UNITS_PER_EM / BITMAP_GLYPH_SIZE
-        path = path.scaled(scale, -scale)
+        #width, height = self.size
+        scale_x = UNITS_PER_EM / BITMAP_GLYPH_SIZE
+        scale_y = UNITS_PER_EM / BITMAP_GLYPH_SIZE
+        #baseline_offset = self.ascent - height + 1
+        baseline_offset = 0
 
-        self.svg_path = path
+        def transform(pt):
+            x, y = pt
+            return (x - min_x) * scale_x, (max_y - y + baseline_offset) * scale_y
+
+        self.outer_scaled = [[transform(pt) for pt in path] for path in outer_paths]
+        self.holes_scaled = [[transform(pt) for pt in path] for path in hole_paths]
 
     def valid(self):
         if self.codepoint is None:
@@ -143,6 +103,61 @@ class Glyph:
             return False
 
         return True
+
+    def write_svg_paths(self, suffix, outer, holes, canvas_size=8):
+        """
+        Outputs a visual SVG of outer and hole paths.
+        Outer paths = black fill, red stroke.
+        Hole paths = white fill, blue stroke.
+        """
+        def path_to_d(path):
+            return "M " + " L ".join(f"{x} {y}" for x, y in path) + " Z"
+
+        svg_header = f'''<?xml version="1.0" encoding="UTF-8"?>
+    <svg xmlns="http://www.w3.org/2000/svg"
+         width="{canvas_size*32}" height="{canvas_size*32}" viewBox="0 0 {canvas_size} {canvas_size}"
+         shape-rendering="crispEdges">
+    <g stroke-width="0.05">'''
+
+        def extract_corners(source):
+            if isinstance(source, dict):
+                return [p["corners"] for p in source.values() if "corners" in p]
+            elif isinstance(source, list):
+                return [p for p in source if isinstance(p, list) and len(p) >= 3]
+            else:
+                return []
+
+        # Collect paths
+        outer_paths = extract_corners(outer)
+        hole_paths = extract_corners(holes)
+        all_paths = outer_paths + hole_paths
+        svg_paths = []
+
+        # Draw filled paths
+        for path in outer_paths:
+            svg_paths.append(f'<path d="{path_to_d(path)}" fill="black" stroke="purple"/>')
+        for path in hole_paths:
+            svg_paths.append(f'<path d="{path_to_d(path)}" fill="white" stroke="blue"/>')
+
+        # Track point usage across paths
+        point_usage = defaultdict(int)
+        for path in all_paths:
+            unique_points = set(path)
+            for pt in unique_points:
+                point_usage[pt] += 1
+
+        # Draw intersections
+        for path in all_paths:
+            for x, y in path:
+                #svg_paths.append(f'<circle cx="{x}" cy="{y}" r="0.05" fill="lime"/>')
+                if point_usage[(x, y)] > 1:
+                    svg_paths.append(f'<circle cx="{x}" cy="{y}" r="0.1" fill="red"/>')
+
+        svg_footer = "</g></svg>"
+
+        file_path = os.path.splitext(self.svg_file)[0] + f"_{suffix}.svg"
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(svg_header + "\n" + "\n".join(svg_paths) + "\n" + svg_footer)
 
     def _get_codepoint(self):
         return get_unicode_codepoint(self.unicode)
