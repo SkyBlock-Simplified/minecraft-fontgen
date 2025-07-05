@@ -32,7 +32,7 @@ def convert_unicode_to_glyphs(providers, glyph_storage):
                     continue
 
                 # Export svg path
-                glyph.write_svg_paths("paths")
+                glyph.write_svg_paths()
 
                 # Scale svg
                 glyph.scale()

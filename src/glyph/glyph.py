@@ -104,7 +104,7 @@ class Glyph:
 
         return True
 
-    def write_svg_paths(self, suffix, outer, holes, canvas_size=8):
+    def write_svg_paths(self, canvas_size=8):
         """
         Outputs a visual SVG of outer and hole paths.
         Outer paths = black fill, red stroke.
@@ -128,8 +128,8 @@ class Glyph:
                 return []
 
         # Collect paths
-        outer_paths = extract_corners(outer)
-        hole_paths = extract_corners(holes)
+        outer_paths = extract_corners(self.outer)
+        hole_paths = extract_corners(self.holes)
         all_paths = outer_paths + hole_paths
         svg_paths = []
 
@@ -155,7 +155,7 @@ class Glyph:
 
         svg_footer = "</g></svg>"
 
-        file_path = os.path.splitext(self.svg_file)[0] + f"_{suffix}.svg"
+        file_path = os.path.splitext(self.svg_file)[0] + f"_paths.svg"
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(svg_header + "\n" + "\n".join(svg_paths) + "\n" + svg_footer)
 
