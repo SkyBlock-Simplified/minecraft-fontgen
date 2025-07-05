@@ -1,6 +1,9 @@
+import os
+import zipfile
 import requests
+from six import BytesIO
 
-from src.config import MOJANG_MANIFEST_URL
+from src.config import MOJANG_MANIFEST_URL, SNAPSHOTS
 
 def get_unicode_codepoint(unicode_char: str):
     try:
@@ -13,19 +16,39 @@ def get_unicode_codepoint(unicode_char: str):
 def get_minecraft_versions():
     response = requests.get(MOJANG_MANIFEST_URL)
     response.raise_for_status()
-    data = response.json()
-    return data["versions"]  # List of dicts with id, url, etc.
+    manifest = response.json()
 
-def get_client_jar_url(version_id):
-    versions = get_minecraft_versions()
-    version = next(v for v in versions if v["id"] == version_id)
-    version_meta = requests.get(version["url"]).json()
-    return version_meta["downloads"]["client"]["url"]
+    def filter_type(type):
+        return {
+            v["id"]: {
+                "type": v["type"],
+                "url": v["url"]
+            }
+            for v in manifest["versions"] if v["type"] == type}
 
-def download_client_jar(version_id, output_file):
-    jar_url = get_client_jar_url(version_id)
+    return {
+        "release": filter_type("release"),
+        "snapshot": filter_type("snapshot")
+    }
+
+def get_minecraft_client_jar_url(version_url):
+    version_meta = requests.get(version_url)
+    version_meta.raise_for_status()
+    return version_meta.json()["downloads"]["client"]["url"]
+
+def get_minecraft_jar_data(jar_url):
     response = requests.get(jar_url, stream=True)
     response.raise_for_status()
-    with open(output_file, "wb") as f:
-        for chunk in response.iter_content(chunk_size=8192):
-            f.write(chunk)
+    return BytesIO(response.content)
+
+def extract_font_assets(jar_data, output_path):
+    os.makedirs(output_path, exist_ok=True)
+    extracted = []
+
+    with zipfile.ZipFile(jar_data) as jar:
+        for file in jar.namelist():
+            if file.endswith("default.json") or "font/" in file:
+                jar.extract(file, path=output_path)
+                extracted.append(file)
+
+    return extracted
