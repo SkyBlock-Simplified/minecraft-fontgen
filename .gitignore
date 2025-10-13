@@ -159,6 +159,7 @@ cython_debug/
 font/
 input/
 output/
+work/
 
 # PyCharm
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
