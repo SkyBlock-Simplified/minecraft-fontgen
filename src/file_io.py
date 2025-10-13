@@ -7,9 +7,8 @@ import numpy as np
 from collections import deque
 from tqdm import tqdm
 from PIL import Image
-from src.config import OUTPUT_DIR, MINECRAFT_JAR_FONT_DIR
-from src.util.constants import COLUMNS_PER_ROW, DEFAULT_GLYPH_SIZE
-from src.util.functions import get_unicode_codepoint
+from src.config import COLUMNS_PER_ROW, DEFAULT_GLYPH_SIZE, OUTPUT_DIR, MINECRAFT_JAR_DIR, MINECRAFT_BIN_FILE, MINECRAFT_JSON_FILE, WORK_DIR
+from src.functions import get_unicode_codepoint, get_minecraft_versions, get_minecraft_client_jar_url, get_minecraft_jar_data, extract_font_assets
 
 def convert_tile_into_svg(tile):
     # Read image
@@ -39,11 +38,17 @@ def convert_tile_into_svg(tile):
         f.write(tile["svg"])
 
 def convert_tile_into_pixels(tile):
-    # Convert image to pixels
+    # Convert image to pixel grid
     bitmap_grid = np.array(tile["bitmap"].convert("L"), dtype=int) # White (255) / Black (0)
     bitmap_grid = (bitmap_grid < 128).astype(np.uint8) # White (0) / Black (1)
     height, width = bitmap_grid.shape
-    pixel_grid = np.full((height, width), -999, dtype=int) # Empty grid
+    pixel_grid = np.full((height, width), -999, dtype=int) # Create empty grid
+
+    # Store black pixel grid
+    pixels = {
+        "bitmap": bitmap_grid,
+        "grid": pixel_grid
+    }
 
     def update_grid(queue, bit_match, next_label, neighbours = None):
         while queue:
@@ -76,6 +81,9 @@ def convert_tile_into_pixels(tile):
                     next_label += increment
 
         return labels
+
+    # TODO: Bold and BoltItalic must be calculated after bitmap_grid is loaded,
+    #       and before path/hole labels/groups are traced
 
     # Label glyph groups as 1 and above
     path_labels = label_groups(1, 1, [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)])
@@ -123,10 +131,9 @@ def convert_tile_into_pixels(tile):
         if not boundary_edges:
             return {"coords": coords, "corners": []}
 
-        # Start from top-left most edge
+        # Start from the top-left most edge
         start_edge = min(boundary_edges, key=lambda e: (e[0][1], e[0][0]))
-        path = [start_edge[0]]
-        path = []
+        path = [] # [start_edge[0]]
         current_edge = start_edge
         visited = set()
 
@@ -165,9 +172,6 @@ def convert_tile_into_pixels(tile):
             return path.copy()  # fallback
 
         for i in range(len(path)):
-            # prev = path[i - 1]
-            # curr = path[i]
-            # next = path[i + 1]
             prev = path[(i - 1) % n]
             curr = path[i]
             next = path[(i + 1) % n]
@@ -179,7 +183,6 @@ def convert_tile_into_pixels(tile):
         return corners
 
     def get_path_data(pixel_grid, label):
-        #coords = [tuple([x, y]) for y, x in np.argwhere(pixel_grid == label)]
         coords = trace_pixel_edge_turns(pixel_grid, label)
         return {
             "coords": coords,
@@ -187,6 +190,7 @@ def convert_tile_into_pixels(tile):
         }
 
     tile["pixels"] = {
+        "bitmap": bitmap_grid,
         "grid": pixel_grid,
         "paths": {label: get_path_data(pixel_grid, label) for label in path_labels},
         "holes": {label: get_path_data(pixel_grid, label) for label in hole_labels}
@@ -272,15 +276,23 @@ def slice_providers_into_tiles(providers):
 
         provider["tiles"] = tiles
 
-def read_providers_from_json_file(json_file):
-    print(f"🧩 Parsing '{json_file}'...")
+def read_providers_from_bin(byte_data):
+    glyph_widths = list(byte_data)
 
-    with open(json_file, "rb") as f:
-        raw_bytes = f.read()
+    # # Check length (should be 256 for 16x16 fonts)
+    # print(f"Loaded {len(glyph_widths)} glyph widths.")
+    # print(glyph_widths[:16])  # Print first row of glyph widths
+    print("→ 🛠️ Building bitmap providers...")
 
-    # Decode and parse JSON while preserving surrogate pairs
+    # should be able to convert ascii.png
+    # convert each unicode_page_XX.png into codepoint based on x,y
+    # then get Unicode character from codepoint
+
+    return None
+
+def read_providers_from_json(byte_data):
     print("→ 🛠️ Decoding json...")
-    raw_text = raw_bytes.decode("utf-8", errors="surrogatepass")
+    raw_text = byte_data.decode("utf-8", errors="surrogatepass")
     data = json.loads(raw_text)
 
     print("→ 🛠️ Parsing bitmap providers...")
@@ -289,7 +301,7 @@ def read_providers_from_json_file(json_file):
         if provider.get("type") == "bitmap" and "chars" in provider:
             file_name = provider.get("file", "minecraft:font/").split("minecraft:font/")[-1]
             name = os.path.splitext(file_name)[0]
-            output = OUTPUT_DIR + "/" + name
+            output = f"{OUTPUT_DIR}/glyphs/{name}"
 
             # Create provider directory
             os.makedirs(output, exist_ok=True)
@@ -303,7 +315,7 @@ def read_providers_from_json_file(json_file):
                 "height": provider.get("height", DEFAULT_GLYPH_SIZE),
                 "chars": chars,
                 "file_name": file_name,
-                "file_path": MINECRAFT_JAR_FONT_DIR + "/" + file_name,
+                "file_path": f"{MINECRAFT_JAR_DIR}/textures/font/{file_name}",
                 "name": name,
                 "output": output,
                 "tiles": []
@@ -311,7 +323,100 @@ def read_providers_from_json_file(json_file):
 
     return providers
 
-def clean_output_dir():
+def read_providers_from_file(file, format):
+    print(f"🧩 Parsing '{file}'...")
+    with open(file, "rb") as f:
+        raw_bytes = f.read()
+
+    print(f"→ 🛠️ Decoding {format}...")
+    if format == "bin":
+        return read_providers_from_bin(raw_bytes)
+    elif format == "json":
+        return read_providers_from_json(raw_bytes)
+    else:
+        raise ValueError(f"Unsupported file format: {format}")
+
+def get_minecraft_assets():
+    versions = get_minecraft_versions()
+    selected_version = None
+    selected_data = None
+
+    while selected_version is None:
+        version = input("Enter version number (or 'help'): ").strip().lower()
+
+        def dump_versions(versions):
+            #print(f"Found {len(versions)}:")
+
+            for i, (version, _) in enumerate(versions.items(), 1):
+                tabs = '\t' * (1 if len(version) > 3 else 2)
+                print(version, end=tabs)
+
+                if i % 15 == 0:
+                    print()  # Newline after every 15 items
+
+            # Final newline if needed
+            if len(versions) % 15 != 0:
+                print()
+
+        if version in ["exit", "leave", "quit", "stop"]:
+            print("Exiting...")
+            break
+
+        if version in ["h", "?", "help"]:
+            print("Available commands:")
+            print(" - 'exit' or 'quit' to quit")
+            print(" - 'h', '?' or 'help' to show this help message")
+            print(" - 'r' or 'releases' to list all available releases")
+            print(" - 's' or 'snapshots' to list all available releases")
+            continue
+
+        if version in ["r", "releases", "release"]:
+            dump_versions(versions["release"])
+            continue
+
+        if version in ["s", "snapshots", "snapshot"]:
+            dump_versions(versions["snapshot"])
+            continue
+
+        for type in versions:
+            if version in versions[type]:
+                selected_version = version
+                selected_data = versions[type][version]
+                break
+
+        if not selected_version:
+            print("Invalid version. Please try again.")
+
+    print(f"☕ Downloading {selected_version}.jar...")
+    jar_url = get_minecraft_client_jar_url(selected_data["url"])
+    jar_data = get_minecraft_jar_data(jar_url)
+
+    print("→ 📦 Extracting font assets...")
+    files = extract_font_assets(jar_data, OUTPUT_DIR)
+    matched_file = None
+    matched_format = None
+    for file in files:
+        if MINECRAFT_BIN_FILE.endswith(file):
+            matched_file = MINECRAFT_BIN_FILE
+            matched_format = "bin"
+        elif MINECRAFT_JSON_FILE.endswith(file):
+            matched_file = MINECRAFT_JSON_FILE
+            matched_format = "json"
+
+        if matched_file:
+            print(f"→ 📂 Detected {matched_format} format...")
+            break
+
+    if not matched_file:
+        print("→ ❌ Could not detect font assets format.")
+
+    return matched_file, matched_format
+
+def clean_directories():
+    print("🧹 Cleaning work directory...")
+    shutil.rmtree(WORK_DIR, ignore_errors=True)
+    os.makedirs(WORK_DIR, exist_ok=True)
+
     print("🧹 Cleaning output directory...")
     shutil.rmtree(OUTPUT_DIR, ignore_errors=True)
     os.makedirs(OUTPUT_DIR, exist_ok=True)

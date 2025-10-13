@@ -4,7 +4,7 @@ import requests
 
 from six import BytesIO
 
-from src.config import MOJANG_MANIFEST_URL
+from src.config import MINECRAFT_MANIFEST_URL
 
 def get_unicode_codepoint(unicode_char: str):
     try:
@@ -15,7 +15,7 @@ def get_unicode_codepoint(unicode_char: str):
         return None
 
 def get_minecraft_versions():
-    response = requests.get(MOJANG_MANIFEST_URL)
+    response = requests.get(MINECRAFT_MANIFEST_URL)
     response.raise_for_status()
     manifest = response.json()
 

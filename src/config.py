@@ -9,13 +9,16 @@ OPENTYPE = True # False for TrueType
 CREATE_BMP = True # BMP (Format 4) (U+0000 - U+FFFF)
 CREATE_SMP = True # SMP (Format 12) (U+10000 - U+1FFFF)
 
-# === CONSTANTS / DO NOT EDIT ===
-
 # File Input/Output
 OUTPUT_DIR = "output"
 OUTPUT_FONT_FILE = f"{OUTPUT_DIR}/{FONT_NAME}" + (".otf" if OPENTYPE else ".ttf")
-MOJANG_MANIFEST_URL = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
-MINECRAFT_JAR_DIR = OUTPUT_DIR + "/assets/minecraft"
+
+# === CONSTANTS / DO NOT EDIT ===
+
+# File Input
+WORK_DIR = "work"
+MINECRAFT_MANIFEST_URL = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
+MINECRAFT_JAR_DIR = WORK_DIR + "/assets/minecraft"
 MINECRAFT_BIN_FILE = f"{MINECRAFT_JAR_DIR}/font/glyph_sizes.bin"
 MINECRAFT_JSON_FILE = f"{MINECRAFT_JAR_DIR}/font/include/default.json"
 
@@ -28,7 +31,10 @@ ASCENT = BOUNDING_BOX[3]
 DESCENT = BOUNDING_BOX[1]
 ADVANCE_WIDTH = BOUNDING_BOX[2] + BOUNDING_BOX[1]
 NOTDEF = ".notdef"
-NOTDEF_GLYPH = [20, 0, 437, 675]
+NOTDEF_GLYPH = [
+    [20, 0, 437, 675], # Inner rectangle
+    [68, 48, 388, 627] # Outer rectangle
+]
 
 # Italic Glyph
 ITALIC_SHEAR_VERTICAL = 5

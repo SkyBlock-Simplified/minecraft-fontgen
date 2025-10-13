@@ -1,15 +1,16 @@
-from file_io import read_providers_from_json_file, clean_output_dir, slice_providers_into_tiles
+from file_io import clean_directories, slice_providers_into_tiles, read_providers_from_file
 from font_creator import create_font_file
-from src.config import OUTPUT_FILE, MINECRAFT_JAR_DEFAULT_JSON, OPENTYPE
-from src.inspect.inspect import inspect_font_file
+from src.config import OUTPUT_FONT_FILE, OPENTYPE
+from src.file_io import get_minecraft_assets
 
 def main():
-    clean_output_dir()
-    providers = read_providers_from_json_file(MINECRAFT_JAR_DEFAULT_JSON)
+    clean_directories()
+    matched_file, matched_format = get_minecraft_assets()
+    providers = read_providers_from_file(matched_file, matched_format)
     slice_providers_into_tiles(providers)
     glyph_storage = create_font_file(providers, OPENTYPE)
-    glyph_storage.save(OUTPUT_FILE)
-    inspect_font_file(OUTPUT_FILE)
+    glyph_storage.save(OUTPUT_FONT_FILE)
+    #inspect_font_file(OUTPUT_FONT_FILE)
     print("✨ Done.")
 
 if __name__ == "__main__":
