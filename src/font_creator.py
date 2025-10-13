@@ -68,7 +68,7 @@ def create_font_file(providers, use_cff: bool = True):
     # italic font: shearing (slant) transformation: X-axis shear
     # every row of pixels is shifted right by a small offset based on its vertical position
     # shear factor: 0.2
-    # shear angle: 11.31: atan(0.2)
+    # shear angle: 11.3099325 deg / 0.19739556 rad / atan(0.2)
 
     # Create glyph storage
     glyph_storage = GlyphStorage(font, use_cff)
