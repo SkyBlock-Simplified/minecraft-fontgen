@@ -301,7 +301,7 @@ def read_providers_from_json(byte_data):
         if provider.get("type") == "bitmap" and "chars" in provider:
             file_name = provider.get("file", "minecraft:font/").split("minecraft:font/")[-1]
             name = os.path.splitext(file_name)[0]
-            output = f"{OUTPUT_DIR}/glyphs/{name}"
+            output = f"{WORK_DIR}/glyphs/{name}"
 
             # Create provider directory
             os.makedirs(output, exist_ok=True)
@@ -392,7 +392,7 @@ def get_minecraft_assets():
     jar_data = get_minecraft_jar_data(jar_url)
 
     print("→ 📦 Extracting font assets...")
-    files = extract_font_assets(jar_data, OUTPUT_DIR)
+    files = extract_font_assets(jar_data, WORK_DIR)
     matched_file = None
     matched_format = None
     for file in files:
