@@ -25,12 +25,23 @@ class Glyph:
         self.outer_scaled = {}
         self.holes_scaled = {}
 
+        # TODO: Reverse-engineer unscaled coordinates,
+        #       pass the pixels and paths data for .notdef,
+        #       let #scale and #draw handle this
+        # Draw .notdef
         if self.codepoint == 0x0000:
-            # Draw rectangle using the bounding box
-            self.pen.moveTo((NOTDEF_GLYPH[0], NOTDEF_GLYPH[1]))
-            self.pen.lineTo((NOTDEF_GLYPH[0], NOTDEF_GLYPH[3]))
-            self.pen.lineTo((NOTDEF_GLYPH[2], NOTDEF_GLYPH[3]))
-            self.pen.lineTo((NOTDEF_GLYPH[2], NOTDEF_GLYPH[1]))
+            # Draw outer rectangle
+            self.pen.moveTo((NOTDEF_GLYPH[0][0], NOTDEF_GLYPH[0][1]))
+            self.pen.lineTo((NOTDEF_GLYPH[0][0], NOTDEF_GLYPH[0][3]))
+            self.pen.lineTo((NOTDEF_GLYPH[0][2], NOTDEF_GLYPH[0][3]))
+            self.pen.lineTo((NOTDEF_GLYPH[0][2], NOTDEF_GLYPH[0][1]))
+            self.pen.closePath()
+
+            # Draw inner rectangle
+            self.pen.moveTo((NOTDEF_GLYPH[1][0], NOTDEF_GLYPH[1][1]))
+            self.pen.lineTo((NOTDEF_GLYPH[1][0], NOTDEF_GLYPH[1][3]))
+            self.pen.lineTo((NOTDEF_GLYPH[1][2], NOTDEF_GLYPH[1][3]))
+            self.pen.lineTo((NOTDEF_GLYPH[1][2], NOTDEF_GLYPH[1][1]))
             self.pen.closePath()
 
     def draw(self):
@@ -82,9 +93,16 @@ class Glyph:
         min_x = min(x for x, y in all_points)
         max_y = max(y for x, y in all_points)
 
-        #width, height = self.size
         scale_x = UNITS_PER_EM / DEFAULT_GLYPH_SIZE
         scale_y = UNITS_PER_EM / DEFAULT_GLYPH_SIZE
+
+        # TODO: Bounding box scaling correction might fix offset
+        # Width = 16 × 8 = 128 pixels
+        # The bounding box goes from x = 0 to x = 1152, so:
+        # scale_x = 1152 / 128 = 9.0 units per pixel
+        # scale_y = (896 - (-128)) / 8 = 1024 / 8 = 128.0 units per pixel
+
+        #width, height = self.size
         #baseline_offset = self.ascent - height + 1
         baseline_offset = 0
 
@@ -149,7 +167,6 @@ class Glyph:
         # Draw intersections
         for path in all_paths:
             for x, y in path:
-                #svg_paths.append(f'<circle cx="{x}" cy="{y}" r="0.05" fill="lime"/>')
                 if point_usage[(x, y)] > 1:
                     svg_paths.append(f'<circle cx="{x}" cy="{y}" r="0.1" fill="red"/>')
 
