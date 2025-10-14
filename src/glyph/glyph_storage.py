@@ -1,10 +1,10 @@
 from collections import OrderedDict
 
 from src.glyph.glyph import Glyph
-from src.config import BOUNDING_BOX, NOTDEF, DEFAULT_GLYPH_SIZE, UNITS_PER_EM
+from src.config import NOTDEF, DEFAULT_GLYPH_SIZE, UNITS_PER_EM, UNITS_PER_PIXEL
 
 class GlyphStorage:
-    def __init__(self, font, use_cff: True):
+    def __init__(self, font, use_cff:bool = True):
         print("→ 📄 Creating glyph storage...")
         self.font = font
         self.tables = font["cmap"].tables
@@ -22,9 +22,8 @@ class GlyphStorage:
 
     def add(self, glyph: Glyph):
         name = glyph.name
-        units_per_pixel = UNITS_PER_EM / DEFAULT_GLYPH_SIZE
-        advance_width = round(glyph.width * units_per_pixel)
-        lsb = BOUNDING_BOX[0] # Left-side bearing
+        advance_width = UNITS_PER_EM // 2 if name in ("space", "uni0020") else int(round(glyph.advance * UNITS_PER_PIXEL))
+        lsb = int(round(glyph.lsb * UNITS_PER_PIXEL))
         self.hmtx[name] = (advance_width, lsb)
 
         # Draw font glyph
