@@ -7,6 +7,7 @@ def main():
     clean_directories()
     matched_file, matched_format = get_minecraft_assets()
     providers = read_providers_from_file(matched_file, matched_format)
+    # TODO: Bold and Italic
     slice_providers_into_tiles(providers)
     glyph_storage = create_font_file(providers, OPENTYPE)
     glyph_storage.save(OUTPUT_FONT_FILE)
