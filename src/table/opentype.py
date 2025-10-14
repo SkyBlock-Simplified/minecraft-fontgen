@@ -8,6 +8,7 @@ from src.config import FONT_NAME, VERSION, AUTHOR, BOUNDING_BOX, UNITS_PER_EM
 
 def create_ot_font_tables(font):
     print("→ 📄 Creating opentype table...")
+    font.sfntVersion = "OTTO"
     cff = font["CFF "] = newTable("CFF ")
     cff_font_set = CFFFontSet()
     top_dict = TopDict(None)
@@ -29,12 +30,9 @@ def create_ot_font_tables(font):
 
     # Rebuild CharStrings
     private = PrivateDict(None, None, 0)
-    #private.defaultWidthX = ADVANCE_WIDTH
-    #private.nominalWidthX = 0
     fd_array = [FontDict()]
     fd_array[0].Private = private
     fd_select = FDSelect()
-    #global_subrs = Index()
     charstrings = CharStrings(
         None,
         top_dict,

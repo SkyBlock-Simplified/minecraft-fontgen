@@ -5,6 +5,7 @@ from fontTools.ttLib.tables.ttProgram import Program
 
 def create_tt_font_tables(font):
     print("→ 📄 Creating truetype table...")
+    font.sfntVersion = 0x00010000
     font["glyf"] = newTable("glyf")
     font["glyf"].glyphs = {}
 
