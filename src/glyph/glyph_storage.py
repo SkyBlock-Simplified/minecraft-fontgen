@@ -1,7 +1,7 @@
 from collections import OrderedDict
 
 from src.glyph.glyph import Glyph
-from src.config import ADVANCE_WIDTH, BOUNDING_BOX, NOTDEF, DEFAULT_GLYPH_SIZE
+from src.config import BOUNDING_BOX, NOTDEF, DEFAULT_GLYPH_SIZE, UNITS_PER_EM
 
 class GlyphStorage:
     def __init__(self, font, use_cff: True):
@@ -22,12 +22,15 @@ class GlyphStorage:
 
     def add(self, glyph: Glyph):
         name = glyph.name
-        self.hmtx[name] = (ADVANCE_WIDTH, BOUNDING_BOX[0])
+        units_per_pixel = UNITS_PER_EM / DEFAULT_GLYPH_SIZE
+        advance_width = round(glyph.width * units_per_pixel)
+        lsb = BOUNDING_BOX[0] # Left-side bearing
+        self.hmtx[name] = (advance_width, lsb)
 
         # Draw font glyph
         font_glyph = glyph.get()
         if self.use_cff:
-            font_glyph.width = ADVANCE_WIDTH
+            font_glyph.width = advance_width
             font_glyph.private = self.top_dict.Private
         self.glyphs[name] = font_glyph
 
@@ -51,16 +54,6 @@ class GlyphStorage:
             "location": (0, 0),
             "output": None
         }, self.use_cff))
-
-    def get(self, pen):
-        if self.use_cff:
-            glyph = pen.getCharString()
-            glyph.width = ADVANCE_WIDTH
-            glyph.private = self.top_dict.Private
-        else:
-            glyph = pen.glyph()
-
-        return glyph
 
     def new_glyph(self, tile):
         return Glyph(tile, self.use_cff)
@@ -95,3 +88,6 @@ class GlyphStorage:
         self.font["maxp"].numGlyphs = total_glyphs # Total number of glyphs in the font
         self.font["OS/2"].usFirstCharIndex = self.cpr[0] # First Unicode codepoint in the font
         self.font["OS/2"].usLastCharIndex = self.cpr[1] # Last Unicode codepoint in the font
+
+        advances = [aw for (aw, _lsb) in self.hmtx.values() if aw is not None]
+        self.font["OS/2"].xAvgCharWidth = int(round(sum(advances) / len(advances))) # Average character width (mean of the advanced widths)

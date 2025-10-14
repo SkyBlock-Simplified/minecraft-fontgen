@@ -53,4 +53,3 @@ def create_font_metrics_table(font):
     os2.ySuperscriptXSize = 650 # Superscript character width
     os2.ySuperscriptYOffset = 350 # Vertical offset for superscript
     os2.ySuperscriptYSize = 600 # Superscript character height
-    os2.xAvgCharWidth = 512 # Average character width (mean of the advanced widths)
