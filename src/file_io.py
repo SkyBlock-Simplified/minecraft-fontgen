@@ -10,45 +10,51 @@ from PIL import Image
 from src.config import COLUMNS_PER_ROW, DEFAULT_GLYPH_SIZE, OUTPUT_DIR, MINECRAFT_JAR_DIR, MINECRAFT_BIN_FILE, MINECRAFT_JSON_FILE, WORK_DIR
 from src.functions import get_unicode_codepoint, get_minecraft_versions, get_minecraft_client_jar_url, get_minecraft_jar_data, extract_font_assets
 
-def convert_tile_into_svg(tile):
+def convert_tile_into_svg(tile, bold = False):
     # Read image
     width, height = tile["size"]
+    gtype = "bold" if bold else "regular"
 
     # Write <rect> elements left-aligned
     svg_rects = [
         f'<rect x="{x}" y="{y}" width="1" height="1" />'
-        for y, row in enumerate(tile["pixels"]["grid"])
+        for y, row in enumerate(tile["pixels"][gtype]["grid"])
         for x, val in enumerate(row)
         if val >= 1
     ]
+
     # TODO: BOLD AND ITALIC
     #transform = f"matrix(1,0,{ITALIC_SHEAR_FACTOR},1,0,0)"
 
-    tile["svg"] = f'''<?xml version="1.0" standalone="no"?>
+    # Save file
+    svg = {
+        "xml": f'''<?xml version="1.0" standalone="no"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 {width} {height}" shape-rendering="crispEdges">
     <g fill="black">
         {''.join(svg_rects)}
     </g>
 </svg>
-'''
+''',
+        "file": f"{tile['output']}/{gtype}.svg"
+    }
 
-    # Save file
-    tile["svg_file"] = f"{tile['output']}/regular.svg"
-    with open(tile["svg_file"], "w", encoding="utf-8") as f:
-        f.write(tile["svg"])
+    with open(svg["file"], "w", encoding="utf-8") as f:
+        f.write(svg["xml"])
 
-def convert_tile_into_pixels(tile):
+    return svg
+
+def convert_tile_into_pixels(tile, bold = False):
     # Convert image to pixel grid
     bitmap_grid = np.array(tile["bitmap"].convert("L"), dtype=int) # White (255) / Black (0)
     bitmap_grid = (bitmap_grid < 128).astype(np.uint8) # White (0) / Black (1)
     height, width = bitmap_grid.shape
     pixel_grid = np.full((height, width), -999, dtype=int) # Create empty grid
 
-    # Store black pixel grid
-    pixels = {
-        "bitmap": bitmap_grid,
-        "grid": pixel_grid
-    }
+    if bold: # iterate from bottom to top, right to left
+        for i in range(bitmap_grid.shape[0] - 1, -1, -1):
+            for j in range(bitmap_grid.shape[1] - 1, -1, -1):
+                if bitmap_grid[i, j] == 1 and j + 1 < bitmap_grid.shape[1] and bitmap_grid[i, j + 1] == 0:
+                    bitmap_grid[i, j + 1] = 1 # copy 1 to the right
 
     def update_grid(queue, bit_match, next_label, neighbours = None):
         while queue:
@@ -81,9 +87,6 @@ def convert_tile_into_pixels(tile):
                     next_label += increment
 
         return labels
-
-    # TODO: Bold and BoltItalic must be calculated after bitmap_grid is loaded,
-    #       and before path/hole labels/groups are traced
 
     # Label glyph groups as 1 and above
     path_labels = label_groups(1, 1, [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)])
@@ -189,9 +192,14 @@ def convert_tile_into_pixels(tile):
             "corners": extract_corners_from_path(coords)
         }
 
-    tile["pixels"] = {
+    # Determine glyph sides
+    col_sums = pixel_grid.sum(axis=0) # Sum each column to see where 1's exist
+    col_ones = np.where(col_sums > 0)[0] # Find indices where there is at least one 1 in that column
+
+    return {
         "bitmap": bitmap_grid,
         "grid": pixel_grid,
+        "width": col_ones[-1] - col_ones[0] + 1 if len(col_ones) > 0 else DEFAULT_GLYPH_SIZE,
         "paths": {label: get_path_data(pixel_grid, label) for label in path_labels},
         "holes": {label: get_path_data(pixel_grid, label) for label in hole_labels}
     }
@@ -269,10 +277,16 @@ def slice_providers_into_tiles(providers):
                 crop_tile_from_bitmap(bitmap, tile)
 
                 # Create pixel grid and collect hole data
-                convert_tile_into_pixels(tile)
+                tile["pixels"] = {
+                    "regular": convert_tile_into_pixels(tile),
+                    "bold": convert_tile_into_pixels(tile, bold=True)
+                }
 
                 # Create svg files
-                convert_tile_into_svg(tile)
+                tile["svg"] = {
+                    "regular": convert_tile_into_svg(tile),
+                    "bold": convert_tile_into_svg(tile, bold=True)
+                }
 
         provider["tiles"] = tiles
 
