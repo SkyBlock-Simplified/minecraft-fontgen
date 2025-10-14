@@ -1,9 +1,19 @@
 from math import atan
 
-# Font
-AUTHOR = "CraftedFury"
+# Font Naming
 FONT_NAME = "Minecraft"
 VERSION = "1.1.0"
+MANUFACTURER = "SkyBlock Simplified"
+DESIGNER = "CraftedFury"
+COPYRIGHT = "Copyright © Mojang AB"
+TRADEMARK = "The glyphs used in this font file are trademarked by Mojang."
+VENDOR_URL = "https://github.com/SkyBlock-Simplified/minecraft-fontgen"
+DESIGNER_URL = "https://sbs.dev/"
+LICENSE_TEXT = "The glyphs used in this font file are licensed by Mojang."
+DESCRIPTION = "Build your own font files containing the Minecraft font glyphs."
+SAMPLE_TEXT = "The quick brown fox jumps over the lazy dog. 0123456789"
+
+# Font Structure
 MAC_EPOCH = 2082844800 # FontTools requires seconds since 12:00 midnight, January 1, 1904 UTC
 OPENTYPE = True # False for TrueType
 CREATE_BMP = True # BMP (Format 4) (U+0000 - U+FFFF)

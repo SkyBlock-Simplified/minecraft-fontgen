@@ -4,9 +4,11 @@ from fontTools.cffLib import (
     PrivateDict, FontDict, FDSelect, CharStrings
 )
 
-from src.config import FONT_NAME, VERSION, AUTHOR, BOUNDING_BOX, UNITS_PER_EM
+from src.config import FONT_NAME, BOUNDING_BOX, UNITS_PER_EM
+from src.functions import get_font_type
 
-def create_ot_font_tables(font):
+
+def create_ot_font_tables(font, bold = False, italic = False):
     print("→ 📄 Creating opentype table...")
     font.sfntVersion = "OTTO"
     cff = font["CFF "] = newTable("CFF ")
@@ -17,14 +19,14 @@ def create_ot_font_tables(font):
     cff_font_set.topDictIndex = top_dict_index
     cff_font_set.major = 1
     cff_font_set.minor = 0
-    cff_font_set.fontNames = [FONT_NAME + "Regular"]
+    cff_font_set.fontNames = [FONT_NAME + get_font_type(bold, italic)]
     cff_font_set.GlobalSubrs = Index()
 
-    top_dict.FamilyName = f"{FONT_NAME} Font"
-    top_dict.Weight = "Regular"
-    top_dict.FullName = f"{FONT_NAME} Font Regular"
-    top_dict.version = f"Version {VERSION}"
-    top_dict.Notice = f"{FONT_NAME} Font Generation by {AUTHOR}"
+    #top_dict.FamilyName = f"{FONT_NAME} Font"
+    #top_dict.Weight = "Regular"
+    #top_dict.FullName = f"{FONT_NAME} Font Regular"
+    #top_dict.version = f"Version {VERSION}"
+    #top_dict.Notice = f"{FONT_NAME} Font Generation by {DESIGNER}"
     top_dict.FontBBox = BOUNDING_BOX
     top_dict.FontMatrix = [1 / UNITS_PER_EM, 0, 0, 1 / UNITS_PER_EM, 0, 0]
 

@@ -14,6 +14,12 @@ def get_unicode_codepoint(unicode_char: str):
     except Exception:
         return None
 
+def get_font_type(bold = False, italic = False):
+    gtype = "Bold" if bold else "Regular"
+    gtype = "Italic" if italic else gtype
+    gtype = "BoldItalic" if bold and italic else gtype
+    return gtype
+
 def get_minecraft_versions():
     response = requests.get(MINECRAFT_MANIFEST_URL)
     response.raise_for_status()
