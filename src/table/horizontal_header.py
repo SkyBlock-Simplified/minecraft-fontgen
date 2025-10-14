@@ -1,11 +1,11 @@
 from fontTools.ttLib import newTable
 
-from src.config import ASCENT, DESCENT, ADVANCE_WIDTH, BOUNDING_BOX
+from src.config import ASCENT, DESCENT, MAX_ADVANCE_WIDTH, BOUNDING_BOX
 
 def create_font_hheader_table(font, use_cff: bool = True):
     print("→ 📄 Generating horizontal header table...")
     hhea = font["hhea"] = newTable("hhea")
-    hhea.advanceWidthMax = ADVANCE_WIDTH # Maximum advance width among all glyphs
+    hhea.advanceWidthMax = MAX_ADVANCE_WIDTH # Maximum advance width among all glyphs
     #hhea.ascender = ASCENT
     hhea.ascent = ASCENT # Used for line height and vertical alignment
     hhea.caretOffset = 0
