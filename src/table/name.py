@@ -11,5 +11,5 @@ def create_font_name_table(font):
         makeName("Regular", 2, 3, 1, 0x409),
         makeName(f"{FONT_NAME} Font Regular", 4, 3, 1, 0x409),
         makeName(f"Version {VERSION}", 5, 3, 1, 0x409),
-        makeName(f"{FONT_NAME}FontRegular", 6, 3, 1, 0x409),
+        makeName(f"{FONT_NAME}Regular", 6, 3, 1, 0x409),
     ]
