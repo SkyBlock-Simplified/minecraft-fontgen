@@ -55,7 +55,7 @@ def create_font_file(providers, use_cff: bool = True, bold: bool = False, italic
     create_font_mprofile_table(font, use_cff)
     create_font_pscript_table(font, use_cff)
     create_font_hmetrics_table(font)
-    create_font_name_table(font)
+    create_font_name_table(font, bold, italic)
     create_font_metrics_table(font)
     create_font_mapping_table(font)
 
