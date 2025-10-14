@@ -53,10 +53,10 @@ def create_font_file(providers, use_cff: bool = True):
     create_font_header_table(font, use_cff)
     create_font_hheader_table(font, use_cff)
     create_font_mprofile_table(font, use_cff)
+    create_font_pscript_table(font, use_cff)
     create_font_hmetrics_table(font)
     create_font_name_table(font)
     create_font_metrics_table(font)
-    create_font_pscript_table(font, use_cff)
     create_font_mapping_table(font)
 
     if use_cff:
