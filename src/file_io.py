@@ -195,11 +195,16 @@ def convert_tile_into_pixels(tile, bold = False):
     # Determine glyph sides
     col_sums = pixel_grid.sum(axis=0) # Sum each column to see where 1's exist
     col_ones = np.where(col_sums > 0)[0] # Find indices where there is at least one 1 in that column
+    min_x = col_ones[0] if len(col_ones) > 0 else 0
+    max_x = col_ones[-1] if len(col_ones) > 0 else DEFAULT_GLYPH_SIZE - 1
+    width = col_ones[-1] - col_ones[0] + 1 if len(col_ones) > 0 else DEFAULT_GLYPH_SIZE
 
     return {
         "bitmap": bitmap_grid,
         "grid": pixel_grid,
-        "width": col_ones[-1] - col_ones[0] + 1 if len(col_ones) > 0 else DEFAULT_GLYPH_SIZE,
+        "width": (max_x - min_x + 1),
+        "lsb": min_x,
+        "advance": (min_x + width + 1),
         "paths": {label: get_path_data(pixel_grid, label) for label in path_labels},
         "holes": {label: get_path_data(pixel_grid, label) for label in hole_labels}
     }

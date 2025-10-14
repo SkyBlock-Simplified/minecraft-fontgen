@@ -20,6 +20,8 @@ class Glyph:
         # Pixels
         self.pixels = tile["pixels"] if "pixels" in tile else []
         self.width = self.pixels["width"] if "width" in self.pixels else DEFAULT_GLYPH_SIZE
+        self.advance = self.pixels["advance"] if "advance" in self.pixels else DEFAULT_GLYPH_SIZE
+        self.lsb = self.pixels["lsb"] if "lsb" in self.pixels else 0
         self.outer = self.pixels["paths"] if "paths" in self.pixels else {}
         self.holes = self.pixels["holes"] if "holes" in self.pixels else {}
         self.outer_scaled = {}
