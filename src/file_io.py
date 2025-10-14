@@ -8,12 +8,13 @@ from collections import deque
 from tqdm import tqdm
 from PIL import Image
 from src.config import COLUMNS_PER_ROW, DEFAULT_GLYPH_SIZE, OUTPUT_DIR, MINECRAFT_JAR_DIR, MINECRAFT_BIN_FILE, MINECRAFT_JSON_FILE, WORK_DIR
-from src.functions import get_unicode_codepoint, get_minecraft_versions, get_minecraft_client_jar_url, get_minecraft_jar_data, extract_font_assets
+from src.functions import get_unicode_codepoint, get_minecraft_versions, get_minecraft_client_jar_url, get_minecraft_jar_data, extract_font_assets, get_font_type
 
-def convert_tile_into_svg(tile, bold: bool = False):
+
+def convert_tile_into_svg(tile, bold: bool = False, italic: bool = False):
     # Read image
     width, height = tile["size"]
-    gtype = "bold" if bold else "regular"
+    gtype = get_font_type(bold, italic)
 
     # Write <rect> elements left-aligned
     svg_rects = [
@@ -35,7 +36,7 @@ def convert_tile_into_svg(tile, bold: bool = False):
     </g>
 </svg>
 ''',
-        "file": f"{tile['output']}/{gtype}.svg"
+        "file": f"{tile['output']}/{gtype.lower()}.svg"
     }
 
     with open(svg["file"], "w", encoding="utf-8") as f:
