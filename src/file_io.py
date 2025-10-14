@@ -10,7 +10,7 @@ from PIL import Image
 from src.config import COLUMNS_PER_ROW, DEFAULT_GLYPH_SIZE, OUTPUT_DIR, MINECRAFT_JAR_DIR, MINECRAFT_BIN_FILE, MINECRAFT_JSON_FILE, WORK_DIR
 from src.functions import get_unicode_codepoint, get_minecraft_versions, get_minecraft_client_jar_url, get_minecraft_jar_data, extract_font_assets
 
-def convert_tile_into_svg(tile, bold = False):
+def convert_tile_into_svg(tile, bold: bool = False):
     # Read image
     width, height = tile["size"]
     gtype = "bold" if bold else "regular"
@@ -43,7 +43,7 @@ def convert_tile_into_svg(tile, bold = False):
 
     return svg
 
-def convert_tile_into_pixels(tile, bold = False):
+def convert_tile_into_pixels(tile, bold: bool = False):
     # Convert image to pixel grid
     bitmap_grid = np.array(tile["bitmap"]["image"].convert("L"), dtype=int) # White (255) / Black (0)
     bitmap_grid = (bitmap_grid < 128).astype(np.uint8) # White (0) / Black (1)

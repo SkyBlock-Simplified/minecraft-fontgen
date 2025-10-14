@@ -4,7 +4,7 @@ from src.glyph.glyph import Glyph
 from src.config import NOTDEF, DEFAULT_GLYPH_SIZE, UNITS_PER_EM, UNITS_PER_PIXEL
 
 class GlyphStorage:
-    def __init__(self, font, use_cff:bool = True):
+    def __init__(self, font, use_cff: bool = True):
         print("→ 📄 Creating glyph storage...")
         self.font = font
         self.tables = font["cmap"].tables
