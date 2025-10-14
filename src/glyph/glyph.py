@@ -97,24 +97,16 @@ class Glyph:
 
         all_points = [pt for path in outer_paths + hole_paths for pt in path]
         min_x = min(x for x, y in all_points)
-        max_y = max(y for x, y in all_points)
+        #max_y = max(y for x, y in all_points)
 
-        scale_x = UNITS_PER_EM / DEFAULT_GLYPH_SIZE
-        scale_y = UNITS_PER_EM / DEFAULT_GLYPH_SIZE
-
-        # TODO: Bounding box scaling correction might fix offset
-        # Width = 16 × 8 = 128 pixels
-        # The bounding box goes from x = 0 to x = 1152, so:
-        # scale_x = 1152 / 128 = 9.0 units per pixel
-        # scale_y = (896 - (-128)) / 8 = 1024 / 8 = 128.0 units per pixel
-
-        #width, height = self.size
-        #baseline_offset = self.ascent - height + 1
-        baseline_offset = 0
+        width, height = self.size
+        scale_x = UNITS_PER_EM / width
+        scale_y = UNITS_PER_EM / height
+        descender_offset = height - 1
 
         def transform(pt):
             x, y = pt
-            return (x - min_x) * scale_x, (max_y - y + baseline_offset) * scale_y
+            return (x - min_x) * scale_x, (descender_offset - y) * scale_y
 
         self.outer_scaled = [[transform(pt) for pt in path] for path in outer_paths]
         self.holes_scaled = [[transform(pt) for pt in path] for path in hole_paths]
