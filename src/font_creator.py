@@ -43,7 +43,7 @@ def convert_unicode_to_glyphs(providers, glyph_storage):
                 # Save glyph
                 glyph_storage.add(glyph)
 
-def create_font_file(providers, use_cff: bool = True):
+def create_font_file(providers, use_cff: bool = True, bold: bool = False, italic: bool = False):
     font_icon = "🅾️" if use_cff else "🆎"
     font_type = "OpenType" if use_cff else "TrueType"
     print(f"{font_icon} Creating {font_type} font file...")
@@ -60,7 +60,7 @@ def create_font_file(providers, use_cff: bool = True):
     create_font_mapping_table(font)
 
     if use_cff:
-        create_ot_font_tables(font)
+        create_ot_font_tables(font, bold, italic)
     else:
         create_tt_font_tables(font)
 

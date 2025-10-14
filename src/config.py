@@ -19,11 +19,18 @@ OPENTYPE = True # False for TrueType
 CREATE_BMP = True # BMP (Format 4) (U+0000 - U+FFFF)
 CREATE_SMP = True # SMP (Format 12) (U+10000 - U+1FFFF)
 
+# === CONSTANTS / DO NOT EDIT ===
+
 # File Input/Output
 OUTPUT_DIR = "output"
-OUTPUT_FONT_FILE = f"{OUTPUT_DIR}/{FONT_NAME}" + (".otf" if OPENTYPE else ".ttf")
-
-# === CONSTANTS / DO NOT EDIT ===
+OUTPUT_FONTS = [
+    ("Regular", False, False),
+    #("Bold", True, False),
+    #("Italic", False, True),
+    #("BoldItalic", True, True)
+]
+OUTPUT_FONT_FILE = f"{OUTPUT_DIR}/{FONT_NAME}"
+OUTPUT_FONT_EXT = "otf" if OPENTYPE else "ttf"
 
 # File Input
 WORK_DIR = "work"
