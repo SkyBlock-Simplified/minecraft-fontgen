@@ -16,7 +16,6 @@ class Glyph:
         self.svg = tile["svg"] if "svg" in tile else None
         self.size = tile["size"] or (DEFAULT_GLYPH_SIZE, DEFAULT_GLYPH_SIZE)
         self.ascent = tile["ascent"] if "ascent" in tile else 0
-        self.pen = self._new_pen()
 
         # Pixels
         self.pixels = tile["pixels"] if "pixels" in tile else []
@@ -25,6 +24,9 @@ class Glyph:
         self.holes = self.pixels["holes"] if "holes" in self.pixels else {}
         self.outer_scaled = {}
         self.holes_scaled = {}
+
+        # Create pen
+        self.pen = self._new_pen()
 
         # TODO: Reverse-engineer unscaled coordinates,
         #       pass the pixels and paths data for .notdef,
@@ -182,14 +184,6 @@ class Glyph:
         return get_unicode_codepoint(self.unicode)
 
     def _get_name(self):
-        # Reuse existing glyph name if available in any cmap table
-        # existing_name = None
-        # for table in font["cmap"].tables:
-        # if table.isUnicode():
-        # existing_name = table.cmap.get(codepoint)
-        # if existing_name:
-        # return existing_name
-
         if self.codepoint == 0x0000:
             return NOTDEF
         elif self.codepoint <= 0xFFFF:
@@ -199,6 +193,8 @@ class Glyph:
 
     def _new_pen(self):
         if self.use_cff:
-            return T2CharStringPen(UNITS_PER_EM, None)
+            units_per_pixel = UNITS_PER_EM / DEFAULT_GLYPH_SIZE
+            advance_width = round(self.width * units_per_pixel)
+            return T2CharStringPen(advance_width, None)
         else:
             return TTGlyphPen(None)
