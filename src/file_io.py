@@ -18,7 +18,7 @@ def convert_tile_into_svg(tile, bold = False):
     # Write <rect> elements left-aligned
     svg_rects = [
         f'<rect x="{x}" y="{y}" width="1" height="1" />'
-        for y, row in enumerate(tile["pixels"][gtype]["grid"])
+        for y, row in enumerate(tile["pixels"]["grid"])
         for x, val in enumerate(row)
         if val >= 1
     ]
@@ -45,7 +45,7 @@ def convert_tile_into_svg(tile, bold = False):
 
 def convert_tile_into_pixels(tile, bold = False):
     # Convert image to pixel grid
-    bitmap_grid = np.array(tile["bitmap"].convert("L"), dtype=int) # White (255) / Black (0)
+    bitmap_grid = np.array(tile["bitmap"]["image"].convert("L"), dtype=int) # White (255) / Black (0)
     bitmap_grid = (bitmap_grid < 128).astype(np.uint8) # White (0) / Black (1)
     height, width = bitmap_grid.shape
     pixel_grid = np.full((height, width), -999, dtype=int) # Create empty grid
@@ -208,13 +208,17 @@ def crop_tile_from_bitmap(bitmap, tile):
     # Crop tile from bitmap
     x, y = tile["location"]
     width, height = tile["size"]
-    px, py = (x * width, y * height)
-    tile["bitmap"] = bitmap.crop((px, py, px + width, py + height))
+    px, py = (x * DEFAULT_GLYPH_SIZE, y * height)
 
-    # Save tile
-    tile["bmp_file"] = f"{tile['output']}/glyph.bmp"
+    bitmap = {
+        "image": bitmap.crop((px, py, px + DEFAULT_GLYPH_SIZE, py + height)),
+        "file": f"{tile['output']}/glyph.bmp"
+    }
+
+    # Save bitmap
     os.makedirs(tile["output"], exist_ok=True)
-    tile["bitmap"].save(tile["bmp_file"])
+    bitmap["image"].save(bitmap["file"])
+    return bitmap
 
 def read_provider_bitmap(provider):
     img = Image.open(provider["file_path"]).convert("RGBA")
@@ -236,7 +240,7 @@ def read_provider_bitmap(provider):
 
     return img
 
-def slice_providers_into_tiles(providers):
+def slice_providers_into_tiles(providers, bold = False, italic = False):
     print(f"✂️ Slicing bitmap providers into tiles...")
 
     for provider in providers:
@@ -273,20 +277,14 @@ def slice_providers_into_tiles(providers):
                 }
                 tiles.append(tile)
 
-                # Crop tile from bitmap
-                crop_tile_from_bitmap(bitmap, tile)
+                # Crop tile bitmap from full bitmap
+                tile["bitmap"] = crop_tile_from_bitmap(bitmap, tile)
 
                 # Create pixel grid and collect hole data
-                tile["pixels"] = {
-                    "regular": convert_tile_into_pixels(tile),
-                    "bold": convert_tile_into_pixels(tile, bold=True)
-                }
+                tile["pixels"] = convert_tile_into_pixels(tile, bold)
 
-                # Create svg files
-                tile["svg"] = {
-                    "regular": convert_tile_into_svg(tile),
-                    "bold": convert_tile_into_svg(tile, bold=True)
-                }
+                # Create svg xml and files
+                tile["svg"] = convert_tile_into_svg(tile, bold)
 
         provider["tiles"] = tiles
 
