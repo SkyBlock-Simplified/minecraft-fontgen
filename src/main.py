@@ -1,5 +1,5 @@
-from file_io import clean_directories, slice_providers_into_tiles, read_providers_from_file
-from font_creator import create_font_file
+from src.file_io import clean_directories, slice_providers_into_tiles, read_providers_from_file
+from src.font_creator import create_font_file
 from src.config import OUTPUT_FONT_FILE, OPENTYPE, OUTPUT_FONTS, OUTPUT_FONT_EXT
 from src.file_io import get_minecraft_assets
 
