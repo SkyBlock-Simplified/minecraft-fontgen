@@ -13,13 +13,14 @@ class Glyph:
         self.codepoint = self._get_codepoint() if "codepoint" not in tile else tile["codepoint"]
         self.use_cff = use_cff
         self.name = self._get_name()
-        self.svg_file = tile["svg_file"] if "svg_file" in tile else None
+        self.svg = tile["svg"] if "svg" in tile else None
         self.size = tile["size"] or (DEFAULT_GLYPH_SIZE, DEFAULT_GLYPH_SIZE)
         self.ascent = tile["ascent"] if "ascent" in tile else 0
         self.pen = self._new_pen()
 
         # Pixels
         self.pixels = tile["pixels"] if "pixels" in tile else []
+        self.width = self.pixels["width"] if "width" in self.pixels else DEFAULT_GLYPH_SIZE
         self.outer = self.pixels["paths"] if "paths" in self.pixels else {}
         self.holes = self.pixels["holes"] if "holes" in self.pixels else {}
         self.outer_scaled = {}
@@ -28,6 +29,7 @@ class Glyph:
         # TODO: Reverse-engineer unscaled coordinates,
         #       pass the pixels and paths data for .notdef,
         #       let #scale and #draw handle this
+
         # Draw .notdef
         if self.codepoint == 0x0000:
             # Draw outer rectangle
@@ -172,7 +174,7 @@ class Glyph:
 
         svg_footer = "</g></svg>"
 
-        file_path = os.path.splitext(self.svg_file)[0] + f"_paths.svg"
+        file_path = os.path.splitext(self.svg["file"])[0] + f"_paths.svg"
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(svg_header + "\n" + "\n".join(svg_paths) + "\n" + svg_footer)
 
