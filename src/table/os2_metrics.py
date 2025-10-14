@@ -36,7 +36,9 @@ def create_font_metrics_table(font):
     os2.ulUnicodeRange3 = 0xFFFFFFFF # Bits indicating which Unicode blocks are supported
     os2.ulUnicodeRange4 = 0xFFFFFFFF # Bits indicating which Unicode blocks are supported
     os2.usBreakChar = 32 # Usually space
-    os2.usDefaultChar = 0 # Usually 0
+    os2.usDefaultChar = 32 # Usually space
+    os2.usFirstCharIndex = 32 # Usually space
+    os2.usLastCharIndex = 65535
     os2.usMaxContext = 2 # Minimal context (tune if required)
     os2.usWeightClass = 400 # Weight of the font (e.g., 400 = normal, 700 = bold)
     os2.usWidthClass = 5 # Width of the font (1 = ultra-condensed, 10 = ultra-expanded, 5 = normal)

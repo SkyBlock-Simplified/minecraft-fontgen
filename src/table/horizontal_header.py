@@ -21,5 +21,5 @@ def create_font_hheader_table(font, use_cff: bool = True):
     hhea.reserved1 = 0
     hhea.reserved2 = 0
     hhea.reserved3 = 0
-    hhea.tableVersion = 0x50000000 if use_cff else 0x00010000
+    hhea.tableVersion = 1
     hhea.xMaxExtent = BOUNDING_BOX[2] # Maximum horizontal extent (left sidebearing + glyph width)

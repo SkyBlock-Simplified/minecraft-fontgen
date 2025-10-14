@@ -18,6 +18,6 @@ def create_font_header_table(font, use_cff: bool = True):
     head.macStyle = 0 # Bit flags for font styling (e.g., bold, italic)
     head.magicNumber = 0x5F0F3CF5 # Verification signature for OpenType and TrueType
     head.modified = now + (MAC_EPOCH - int(time.mktime(time.gmtime(0)))) # Last modified timestamp of the font
-    head.tableVersion = 0x00005000 if use_cff else 0x00001000
+    head.tableVersion = 1
     head.unitsPerEm = UNITS_PER_EM # Defines the em square size (Higher values increase the resolution of glyph coordinates)
     head.xMin, head.yMin, head.xMax, head.yMax = BOUNDING_BOX # Bounding Box of all glyphs
