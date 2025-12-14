@@ -49,8 +49,8 @@ def fetch_minecraft_versions():
 
     return {
         "latest": {
-            "release": manifest["latest"],
-            "snapshot": manifest["snapshot"]
+            "release": manifest["latest"]["release"],
+            "snapshot": manifest["latest"].get("snapshot")
         },
         "releases": filter_type("release"),
         "snapshots": filter_type("snapshot")
