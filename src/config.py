@@ -1,5 +1,9 @@
 from math import atan
 
+# ======================
+# === FONT CONSTANTS ===
+# ======================
+
 # Font Naming
 FONT_NAME = "Minecraft"
 VERSION = "1.1.0"
@@ -14,20 +18,27 @@ DESCRIPTION = "Build your own font files containing the Minecraft font glyphs."
 SAMPLE_TEXT = "The quick brown fox jumps over the lazy dog. 0123456789"
 
 # Font Structure
-MAC_EPOCH = 2082844800 # FontTools requires seconds since 12:00 midnight, January 1, 1904 UTC
 OPENTYPE = True # False for TrueType
+UNIFONT = True # False to Disable
 CREATE_BMP = True # BMP (Format 4) (U+0000 - U+FFFF)
 CREATE_SMP = True # SMP (Format 12) (U+10000 - U+1FFFF)
 
-# === CONSTANTS / DO NOT EDIT ===
+# Font Style
+CREATE_REGULAR = True
+CREATE_BOLD = False
+CREATE_ITALIC = False
 
-# File Input/Output
+# ===============================
+# === CONSTANTS / DO NOT EDIT ===
+# ===============================
+
+# File Output
 OUTPUT_DIR = "output"
 OUTPUT_FONTS = [
-    ("Regular", False, False),
-    #("Bold", True, False),
-    #("Italic", False, True),
-    #("BoldItalic", True, True)
+    ("Regular", CREATE_REGULAR, False, False),
+    ("Bold", CREATE_BOLD, True, False),
+    ("Italic", CREATE_ITALIC, False, True),
+    ("BoldItalic", (CREATE_BOLD and CREATE_ITALIC), True, True)
 ]
 OUTPUT_FONT_FILE = f"{OUTPUT_DIR}/{FONT_NAME}"
 OUTPUT_FONT_EXT = "otf" if OPENTYPE else "ttf"
@@ -35,9 +46,13 @@ OUTPUT_FONT_EXT = "otf" if OPENTYPE else "ttf"
 # File Input
 WORK_DIR = "work"
 MINECRAFT_MANIFEST_URL = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
+MINECRAFT_RESOURCE_URL = "https://resources.download.minecraft.net"
 MINECRAFT_JAR_DIR = WORK_DIR + "/assets/minecraft"
 MINECRAFT_BIN_FILE = f"{MINECRAFT_JAR_DIR}/font/glyph_sizes.bin"
 MINECRAFT_JSON_FILE = f"{MINECRAFT_JAR_DIR}/font/include/default.json"
+
+# FontTools Epoch
+MAC_EPOCH = 2082844800 # Seconds since 12:00 midnight, January 1, 1904 UTC
 
 # Glyph
 COLUMNS_PER_ROW = 16
