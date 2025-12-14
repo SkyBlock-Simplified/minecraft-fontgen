@@ -170,9 +170,10 @@ class Glyph:
 
         svg_footer = "</g></svg>"
 
-        file_path = os.path.splitext(self.svg["file"])[0] + f"_paths.svg"
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(svg_header + "\n" + "\n".join(svg_paths) + "\n" + svg_footer)
+        if self.svg and "regular" in self.svg and "file" in self.svg["regular"]:
+            file_path = os.path.splitext(self.svg["regular"]["file"])[0] + f"_paths.svg"
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(svg_header + "\n" + "\n".join(svg_paths) + "\n" + svg_footer)
 
     def _get_codepoint(self):
         return get_unicode_codepoint(self.unicode)
