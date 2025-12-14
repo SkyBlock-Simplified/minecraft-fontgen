@@ -4,7 +4,8 @@ import requests
 
 from six import BytesIO
 
-from src.config import MINECRAFT_MANIFEST_URL
+from src.config import MINECRAFT_MANIFEST_URL, MINECRAFT_RESOURCE_URL
+
 
 def get_unicode_codepoint(unicode_char: str):
     try:
@@ -20,7 +21,20 @@ def get_font_type(bold = False, italic = False):
     gtype = "BoldItalic" if bold and italic else gtype
     return gtype
 
-def get_minecraft_versions():
+def fetch_minecraft_versions():
+    """
+    Fetches the latest Minecraft version details, including releases and snapshots, from the
+    Minecraft manifest URL. The returned data contains categorized details based on version
+    type, i.e., release or snapshot.
+
+    :return: A dictionary containing the latest version information and categorized version
+        lists. The dictionary structure includes:
+
+        - "latest": A dictionary with "release" and "snapshot" latest version IDs.
+        - "releases": A dictionary of all released versions, with their IDs as keys.
+        - "snapshots": A dictionary of all snapshot versions, with their IDs as keys.
+    :rtype: dict
+    """
     response = requests.get(MINECRAFT_MANIFEST_URL)
     response.raise_for_status()
     manifest = response.json()
@@ -34,19 +48,43 @@ def get_minecraft_versions():
             for v in manifest["versions"] if v["type"] == type}
 
     return {
-        "release": filter_type("release"),
-        "snapshot": filter_type("snapshot")
+        "latest": {
+            "release": manifest["latest"],
+            "snapshot": manifest["snapshot"]
+        },
+        "releases": filter_type("release"),
+        "snapshots": filter_type("snapshot")
     }
 
-def get_minecraft_client_jar_url(version_url):
-    version_meta = requests.get(version_url)
+def fetch_minecraft_version_entry(selected_version, version_url):
+    print(f"→ ☕ Downloading {selected_version}.json...")
+    version_data = requests.get(version_url, timeout=30)
+    version_data.raise_for_status()
+    return version_data.json()
+
+def fetch_minecraft_asset_index(asset_index):
+    print(f"→ ☕ Downloading {asset_index['sha1']}/{asset_index['id']}.json...")
+    asset_index_data = requests.get(asset_index["url"], timeout=30)
+    asset_index_data.raise_for_status()
+    return asset_index_data.json()
+
+def fetch_minecraft_asset(sha1):
+    # Mojang CDN layout: resources.download.minecraft.net/<first2>/<sha1>
+    return f"{MINECRAFT_RESOURCE_URL}/{sha1[:2]}/{sha1}"
+
+def fetch_minecraft_client_jar_url(version_url):
+    version_meta = requests.get(version_url, timeout=30)
     version_meta.raise_for_status()
     return version_meta.json()["downloads"]["client"]["url"]
 
-def get_minecraft_jar_data(jar_url):
-    response = requests.get(jar_url, stream=True)
+def fetch_minecraft_jar_data(jar_url):
+    response = requests.get(jar_url, timeout=30, stream=True)
     response.raise_for_status()
     return BytesIO(response.content)
+
+def save_jar_to_disk(jar_data, output_path):
+    with open(f"{output_path}/minecraft.jar", "wb") as f:
+        f.write(jar_data.getbuffer())
 
 def extract_font_assets(jar_data, output_path):
     os.makedirs(output_path, exist_ok=True)

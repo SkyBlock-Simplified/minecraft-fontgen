@@ -7,13 +7,14 @@ def main():
     clean_directories()
     matched_file, matched_format = get_minecraft_assets()
     providers = read_providers_from_file(matched_file, matched_format)
+    slice_providers_into_tiles(providers)
 
     for font in OUTPUT_FONTS:
-        slice_providers_into_tiles(providers, font[1], font[2])
         glyph_storage = create_font_file(providers, OPENTYPE, font[1], font[2])
         output_file = f"{OUTPUT_FONT_FILE}-{font[0]}.{OUTPUT_FONT_EXT}"
         glyph_storage.save(output_file)
         #inspect_font_file(output_file)
+
     print("✨ Done.")
 
 if __name__ == "__main__":
