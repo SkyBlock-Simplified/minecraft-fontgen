@@ -17,13 +17,18 @@ class Glyph:
         self.size = tile["size"] or (DEFAULT_GLYPH_SIZE, DEFAULT_GLYPH_SIZE)
         self.ascent = tile["ascent"] if "ascent" in tile else 0
 
-        # Pixels
-        self.pixels = tile["pixels"] if "pixels" in tile else []
-        self.width = self.pixels["width"] if "width" in self.pixels else DEFAULT_GLYPH_SIZE
-        self.advance = self.pixels["advance"] if "advance" in self.pixels else DEFAULT_GLYPH_SIZE
-        self.lsb = self.pixels["lsb"] if "lsb" in self.pixels else 0
-        self.outer = self.pixels["paths"] if "paths" in self.pixels else {}
-        self.holes = self.pixels["holes"] if "holes" in self.pixels else {}
+        # Pixels - extract the regular variant
+        pixels_data = tile.get("pixels", {})
+        if "regular" in pixels_data:
+            self.pixels = pixels_data["regular"]
+        else:
+            self.pixels = pixels_data if pixels_data else {}
+
+        self.width = self.pixels.get("width", DEFAULT_GLYPH_SIZE)
+        self.advance = self.pixels.get("advance", DEFAULT_GLYPH_SIZE)
+        self.lsb = self.pixels.get("lsb", 0)
+        self.outer = self.pixels.get("paths", {})
+        self.holes = self.pixels.get("holes", {})
         self.outer_scaled = {}
         self.holes_scaled = {}
 
@@ -170,9 +175,10 @@ class Glyph:
 
         svg_footer = "</g></svg>"
 
-        file_path = os.path.splitext(self.svg["file"])[0] + f"_paths.svg"
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(svg_header + "\n" + "\n".join(svg_paths) + "\n" + svg_footer)
+        if self.svg and "regular" in self.svg and "file" in self.svg["regular"]:
+            file_path = os.path.splitext(self.svg["regular"]["file"])[0] + f"_paths.svg"
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(svg_header + "\n" + "\n".join(svg_paths) + "\n" + svg_footer)
 
     def _get_codepoint(self):
         return get_unicode_codepoint(self.unicode)
