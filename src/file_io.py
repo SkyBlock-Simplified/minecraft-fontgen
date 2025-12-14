@@ -8,10 +8,17 @@ from collections import deque
 from tqdm import tqdm
 from PIL import Image
 from src.config import COLUMNS_PER_ROW, DEFAULT_GLYPH_SIZE, OUTPUT_DIR, MINECRAFT_JAR_DIR, MINECRAFT_BIN_FILE, MINECRAFT_JSON_FILE, WORK_DIR
-from src.functions import get_unicode_codepoint, get_minecraft_versions, get_minecraft_client_jar_url, get_minecraft_jar_data, extract_font_assets, get_font_type
+from src.functions import get_unicode_codepoint, fetch_minecraft_versions, fetch_minecraft_client_jar_url, fetch_minecraft_jar_data, extract_font_assets, get_font_type, save_jar_to_disk, fetch_minecraft_version_entry, \
+    fetch_minecraft_asset_index
 
 
-def convert_tile_into_svg(tile, bold: bool = False, italic: bool = False):
+def convert_tile_into_svg(tile):
+    return {
+        "regular": _convert_tile_into_svg(tile, False),
+        "bold": _convert_tile_into_svg(tile, True)
+    }
+
+def _convert_tile_into_svg(tile, bold: bool = False, italic: bool = False):
     # Read image
     width, height = tile["size"]
     gtype = get_font_type(bold, italic)
@@ -19,7 +26,7 @@ def convert_tile_into_svg(tile, bold: bool = False, italic: bool = False):
     # Write <rect> elements left-aligned
     svg_rects = [
         f'<rect x="{x}" y="{y}" width="1" height="1" />'
-        for y, row in enumerate(tile["pixels"]["grid"])
+        for y, row in enumerate(tile["pixels"][gtype.lower()]["grid"])
         for x, val in enumerate(row)
         if val >= 1
     ]
@@ -44,7 +51,13 @@ def convert_tile_into_svg(tile, bold: bool = False, italic: bool = False):
 
     return svg
 
-def convert_tile_into_pixels(tile, bold: bool = False):
+def convert_tile_into_pixels(tile):
+    return {
+        "regular": _convert_tile_into_pixels(tile, False),
+        "bold": _convert_tile_into_pixels(tile, True)
+    }
+
+def _convert_tile_into_pixels(tile, bold: bool = False):
     # Convert image to pixel grid
     bitmap_grid = np.array(tile["bitmap"]["image"].convert("L"), dtype=int) # White (255) / Black (0)
     bitmap_grid = (bitmap_grid < 128).astype(np.uint8) # White (0) / Black (1)
@@ -246,7 +259,7 @@ def read_provider_bitmap(provider):
 
     return img
 
-def slice_providers_into_tiles(providers, bold = False, italic = False):
+def slice_providers_into_tiles(providers):
     print(f"✂️ Slicing bitmap providers into tiles...")
 
     for provider in providers:
@@ -287,10 +300,10 @@ def slice_providers_into_tiles(providers, bold = False, italic = False):
                 tile["bitmap"] = crop_tile_from_bitmap(bitmap, tile)
 
                 # Create pixel grid and collect hole data
-                tile["pixels"] = convert_tile_into_pixels(tile, bold)
+                tile["pixels"] = convert_tile_into_pixels(tile)
 
                 # Create svg xml and files
-                tile["svg"] = convert_tile_into_svg(tile, bold)
+                tile["svg"] = convert_tile_into_svg(tile)
 
         provider["tiles"] = tiles
 
@@ -309,7 +322,6 @@ def read_providers_from_bin(byte_data):
     return None
 
 def read_providers_from_json(byte_data):
-    print("→ 🛠️ Decoding json...")
     raw_text = byte_data.decode("utf-8", errors="surrogatepass")
     data = json.loads(raw_text)
 
@@ -355,7 +367,7 @@ def read_providers_from_file(file, format):
         raise ValueError(f"Unsupported file format: {format}")
 
 def get_minecraft_assets():
-    versions = get_minecraft_versions()
+    versions = fetch_minecraft_versions()
     selected_version = None
     selected_data = None
 
@@ -389,11 +401,11 @@ def get_minecraft_assets():
             continue
 
         if version in ["r", "releases", "release"]:
-            dump_versions(versions["release"])
+            dump_versions(versions["releases"])
             continue
 
         if version in ["s", "snapshots", "snapshot"]:
-            dump_versions(versions["snapshot"])
+            dump_versions(versions["snapshots"])
             continue
 
         for type in versions:
@@ -405,9 +417,18 @@ def get_minecraft_assets():
         if not selected_version:
             print("Invalid version. Please try again.")
 
-    print(f"☕ Downloading {selected_version}.jar...")
-    jar_url = get_minecraft_client_jar_url(selected_data["url"])
-    jar_data = get_minecraft_jar_data(jar_url)
+    version_data = fetch_minecraft_version_entry(selected_version, selected_data["url"])
+
+    asset_index = version_data["assetIndex"]
+    if not asset_index:
+        raise RuntimeError("Missing asset index in version data.")
+
+    asset_index_data = fetch_minecraft_asset_index(asset_index)
+    # TODO: unifont loading
+
+    jar_url = fetch_minecraft_client_jar_url(selected_data["url"])
+    jar_data = fetch_minecraft_jar_data(jar_url)
+    save_jar_to_disk(jar_data, WORK_DIR)
 
     print("→ 📦 Extracting font assets...")
     files = extract_font_assets(jar_data, WORK_DIR)

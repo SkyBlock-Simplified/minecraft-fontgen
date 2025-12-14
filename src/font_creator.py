@@ -3,6 +3,7 @@ import sys
 from fontTools.ttLib import TTFont
 from tqdm import tqdm
 
+from src.functions import get_font_type
 from src.glyph.glyph_storage import GlyphStorage
 from src.table.glyph_mappings import create_font_mapping_table
 from src.table.header import create_font_header_table
@@ -46,7 +47,7 @@ def convert_unicode_to_glyphs(providers, glyph_storage):
 def create_font_file(providers, use_cff: bool = True, bold: bool = False, italic: bool = False):
     font_icon = "🅾️" if use_cff else "🆎"
     font_type = "OpenType" if use_cff else "TrueType"
-    print(f"{font_icon} Creating {font_type} font file...")
+    print(f"{font_icon} Creating {font_type} {get_font_type(bold, italic).lower()} font file...")
 
     # Create font tables
     font = TTFont()
