@@ -1,3 +1,6 @@
+import json
+import re
+
 import requests
 
 import minecraft_fontgen.config as config
@@ -35,6 +38,18 @@ def get_font_type(bold = False, italic = False):
     gtype = "BoldItalic" if bold and italic else gtype
     return gtype
 
+def parse_json(text):
+    """Parses JSON text, tolerating trailing commas (which Minecraft's JSONs sometimes include)."""
+    cleaned = re.sub(r',\s*([}\]])', r'\1', text)
+    return json.loads(cleaned)
+
+def in_unifont_ranges(codepoint):
+    """Returns True if the codepoint falls within any configured UNIFONT_RANGES."""
+    for start, end in config.UNIFONT_RANGES:
+        if start <= codepoint <= end:
+            return True
+    return False
+
 def fetch_bytes(url, label=None):
     """Downloads raw bytes from a URL and returns the response content."""
     log(f"→ 🌐 Downloading {label or url}...")
@@ -43,11 +58,11 @@ def fetch_bytes(url, label=None):
     return request.content
 
 def fetch_json(url, label=None):
-    """Downloads and parses JSON from a URL."""
+    """Downloads and parses JSON from a URL, tolerating trailing commas."""
     log(f"→ 🌐 Downloading {label or url}...")
     request = requests.get(url, timeout=30)
     request.raise_for_status()
-    return request.json()
+    return parse_json(request.text)
 
 def fetch_minecraft_resource(sha1, label=None):
     """Fetches a JSON resource from the Mojang CDN by its SHA-1 hash.
