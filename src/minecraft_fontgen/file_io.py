@@ -1,5 +1,4 @@
 import os
-import json
 import shutil
 import sys
 import numpy as np
@@ -268,7 +267,6 @@ def slice_providers_into_tiles(providers):
     log(f"→ ✂️ Slicing bitmap providers into tiles...")
 
     for provider in providers:
-        log(f" → 🖼️ Reading {provider['file_name']}...")
         bitmap = read_provider_bitmap(provider)
         tiles = []
 
@@ -277,7 +275,7 @@ def slice_providers_into_tiles(providers):
         glyph_width = width / COLUMNS_PER_ROW
 
         with tqdm(enumerate(provider["chars"]), total=len(provider["chars"]),
-                  desc=" → 🔣 Tiles", unit="tile",
+                  desc=f" → 🔣 {provider['file_name']}", unit="tile",
                   ncols=80, leave=False, file=sys.stdout, disable=is_silent()) as tiles_progress:
             for i, unicode in tiles_progress:
                 # Skip .notdef
@@ -312,6 +310,9 @@ def slice_providers_into_tiles(providers):
 
         provider["tiles"] = tiles
 
+    total_tiles = sum(len(p["tiles"]) for p in providers)
+    log(f" → 🔢 Sliced {total_tiles} glyphs across {len(providers)} providers...")
+
 def read_providers_from_bin(byte_data):
     """Parses legacy binary glyph_sizes.bin format (Minecraft 1.8.9 and earlier).
 
@@ -327,47 +328,52 @@ def read_providers_from_bin(byte_data):
 
     # 1. Discover unicode_page_XX.png files (16x16 glyphs, 256 chars per page)
     #    Added first so ascii.png can override codepoints 0-255
-    for page in range(256):
-        page_hex = f"{page:02x}"
-        page_file = f"unicode_page_{page_hex}.png"
-        page_path = f"{TEXTURE_PATH}/{page_file}"
+    with tqdm(range(256), desc=" → 🔢 Pages", unit="page",
+              ncols=80, leave=False, file=sys.stdout, disable=is_silent()) as pages_progress:
+        for page in pages_progress:
+            page_hex = f"{page:02x}"
+            pages_progress.set_description(f" → 🔢 Page {page_hex}")
+            page_file = f"unicode_page_{page_hex}.png"
+            page_path = f"{TEXTURE_PATH}/{page_file}"
 
-        if not os.path.isfile(page_path):
-            continue
+            if not os.path.isfile(page_path):
+                continue
 
-        base_cp = page * 256
-        chars = []
-        for i in range(256):
-            cp = base_cp + i
-            if cp < len(glyph_widths) and glyph_widths[cp] != 0 and in_unifont_ranges(cp):
-                chars.append(chr(cp))
-            else:
-                chars.append(chr(0))
+            base_cp = page * 256
+            chars = []
+            for i in range(256):
+                cp = base_cp + i
+                if cp < len(glyph_widths) and glyph_widths[cp] != 0 and in_unifont_ranges(cp):
+                    chars.append(chr(cp))
+                else:
+                    chars.append(chr(0))
 
-        valid_count = sum(1 for c in chars if c != chr(0))
-        if valid_count == 0:
-            continue
+            valid_count = sum(1 for c in chars if c != chr(0))
+            if valid_count == 0:
+                continue
 
-        name = f"unicode_page_{page_hex}"
-        output = f"{WORK_DIR}/glyphs/{name}"
-        os.makedirs(output, exist_ok=True)
+            name = f"unicode_page_{page_hex}"
+            output = f"{WORK_DIR}/glyphs/{name}"
+            os.makedirs(output, exist_ok=True)
 
-        log(f" → 🔢 Detected {valid_count} unicode characters in '{name}'...")
+            providers.append({
+                "ascent": 15,
+                "height": 16,
+                "chars": chars,
+                "file_name": page_file,
+                "file_path": page_path,
+                "name": name,
+                "output": output,
+                "tiles": []
+            })
 
-        providers.append({
-            "ascent": 15,
-            "height": 16,
-            "chars": chars,
-            "file_name": page_file,
-            "file_path": page_path,
-            "name": name,
-            "output": output,
-            "tiles": []
-        })
+    unicode_glyph_count = sum(sum(1 for c in p["chars"] if c != chr(0)) for p in providers)
+    log(f" → 🔢 Detected {unicode_glyph_count} glyphs across {len(providers)} unicode pages...")
 
     # 2. ascii.png (8x8 glyphs, codepoints 0-255)
     #    Added last so it takes priority over unicode_page_00 for overlapping codepoints
-    ascii_file = "ascii.png"
+    name = "ascii"
+    ascii_file = f"{name}.png"
     ascii_path = f"{TEXTURE_PATH}/{ascii_file}"
 
     if os.path.isfile(ascii_path):
@@ -376,7 +382,7 @@ def read_providers_from_bin(byte_data):
         output = f"{WORK_DIR}/glyphs/{name}"
         os.makedirs(output, exist_ok=True)
 
-        log(f" → 🔢 Detected 256 unicode characters in '{name}'...")
+        log(f" → 🔢 Detected 256 glyphs in {ascii_file}...")
 
         providers.append({
             "ascent": 7,
