@@ -1,0 +1,256 @@
+import binascii
+import io
+import os
+import zipfile
+
+from io import BytesIO
+
+from src.config import MINECRAFT_MANIFEST_URL, MINECRAFT_BIN_FILE, MINECRAFT_JSON_FILE, WORK_DIR, UNIFONT_PATH, UNIFONT, UNIFONT_RANGES
+from src.functions import fetch_bytes, fetch_json, fetch_minecraft_resource, fetch_minecraft_resource_bytes
+
+def in_unifont_ranges(codepoint):
+    """Returns True if the codepoint falls within any configured UNIFONT_RANGES."""
+    for start, end in UNIFONT_RANGES:
+        if start <= codepoint <= end:
+            return True
+
+    return False
+
+def extract_font_assets(jar_data, output_path):
+    """Extracts font-related files (default.json, font textures) from the Minecraft JAR."""
+    print("→ 📦 Extracting font assets...")
+    os.makedirs(output_path, exist_ok=True)
+    extracted = []
+
+    with zipfile.ZipFile(jar_data) as jar:
+        for file in jar.namelist():
+            if file.endswith("default.json") or "font/" in file:
+                jar.extract(file, path=output_path)
+                extracted.append(file)
+
+    return extracted
+
+def save_jar_to_disk(jar_data, output_path):
+    """Writes the downloaded JAR BytesIO to disk as minecraft.jar."""
+    print(f"→ 📦 Extracting client.jar...")
+    with open(f"{output_path}/minecraft.jar", "wb") as f:
+        f.write(jar_data.getbuffer())
+
+def parse_unifont_hex_bytes(hex_bytes: bytes):
+    """
+    Parse GNU Unifont .hex content -> dict[int, list[list[int]]]
+    Each glyph becomes a 16-row bitmap of 0/1 ints (duospaced 8x16 or 16x16; some wider blocks exist).
+    """
+    glyphs = {}
+
+    for raw_line in hex_bytes.splitlines():
+        line = raw_line.strip()
+
+        if not line or b':' not in line:
+            continue
+
+        cp_hex, bmp_hex = line.split(b':', 1)
+        try:
+            codepoint = int(cp_hex, 16)
+        except ValueError:
+            continue
+
+        # Skip codepoints outside desired ranges
+        if not in_unifont_ranges(codepoint):
+            continue
+
+        # Each two hex chars -> one byte = 8 horizontal pixels; bitmap is 16 rows high.
+        byte_len = len(bmp_hex) // 2
+        if byte_len == 0:
+            continue
+
+        bytes_per_row = byte_len // 16 # Unifont rows are concatenated with no separators: 16 rows, each width/8 bytes.
+        width = bytes_per_row * 8 # Width is commonly 8 (32 hex digits) or 16 (64 hex digits) pixels wide, infer from total hex length.
+        img_bits = []
+        row_offset = 0
+        raw = binascii.unhexlify(bmp_hex)
+
+        for _ in range(16):
+            row = []
+            row_bytes = raw[row_offset: row_offset + bytes_per_row]
+            row_offset += bytes_per_row
+
+            for b in row_bytes:
+                for bit in range(7, -1, -1):
+                    row.append((b >> bit) & 1)
+
+            # Trim to declared width (safety)
+            img_bits.append(row[:width])
+
+        glyphs[codepoint] = img_bits
+
+    return glyphs
+
+def read_unifont_glyphs(unifont_objects):
+    """Downloads unifont ZIP archives and parses all .hex files into bitmap glyph data."""
+    glyphs = {}
+
+    for path, sha1 in unifont_objects.items():
+        zip_bytes = fetch_minecraft_resource_bytes(sha1, label=path)
+        print(f"→ 📦 Extracting {path}...")
+
+        with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zip_file:
+            for name in zip_file.namelist():
+                if not name.lower().endswith(".hex"):
+                    continue
+
+                glyph = parse_unifont_hex_bytes(zip_file.read(name))
+                glyphs.update(glyph) # later files override
+
+    return glyphs
+
+def find_unifont_objects(asset_index):
+    """Locates unifont ZIP file hashes and size overrides in the Minecraft asset index."""
+    print(f"🧩 Processing unifont objects...")
+    found = {}
+    size_overrides = []
+    objects = asset_index.get("objects", {})
+
+    # Always read the include file to get hex_file paths
+    include_json = objects.get(UNIFONT_PATH)
+    if not include_json or "hash" not in include_json:
+        raise RuntimeError(f"Could not locate {UNIFONT_PATH} in asset index")
+
+    # Download and parse the include file
+    include = fetch_minecraft_resource(include_json["hash"], label="unifont index")
+
+    # Extract hex_file from all providers
+    for provider in include.get("providers", []):
+        hex_file = provider.get("hex_file", "")
+
+        if hex_file.startswith("minecraft:"):
+            # Convert "minecraft:font/unifont.zip" -> "minecraft/font/unifont.zip"
+            key = hex_file.replace("minecraft:", "minecraft/", 1)
+            obj = objects.get(key)
+
+            if obj and "hash" in obj:
+                print(f" → 🔣 Detected {key}...")
+                found[key] = obj["hash"]
+
+        # Extract size_overrides for future use
+        overrides = provider.get("size_overrides", [])
+        if overrides:
+            size_overrides.extend(overrides)
+
+    if not found:
+        raise RuntimeError("Could not locate unifont ZIPs from include file")
+
+    return found, size_overrides
+
+def fetch_minecraft_versions():
+    """Fetches the Minecraft version manifest and organizes versions by type."""
+    manifest = fetch_json(MINECRAFT_MANIFEST_URL, label="version manifest")
+
+    def filter_type(version_type):
+        return {
+            version["id"]: {
+                "type": version["type"],
+                "url": version["url"]
+            }
+            for version in manifest["versions"] if version["type"] == version_type}
+
+    return {
+        "latest": manifest["latest"],
+        "releases": filter_type("release"),
+        "snapshots": filter_type("snapshot")
+    }
+
+def select_minecraft_version():
+    """Interactively prompts the user to select a Minecraft version."""
+    versions = fetch_minecraft_versions()
+    selected_version = None
+    selected_data = None
+
+    while selected_version is None:
+        #version = input("→ 📂 Enter version number (or 'help'): ").strip().lower()
+        version = "1.21.10"
+
+        def dump_versions(_versions):
+            #print(f"Found {len(versions)}:")
+
+            for i, (_version, _) in enumerate(_versions.items(), 1):
+                tabs = '\t' * (1 if len(_version) > 3 else 2)
+                print(_version, end=tabs)
+
+                if i % 15 == 0:
+                    print()  # Newline after every 15 items
+
+            # Final newline if needed
+            if len(_versions) % 15 != 0:
+                print()
+
+        if version in ["exit", "leave", "quit", "stop"]:
+            print("Exiting...")
+            break
+
+        if version in ["h", "?", "help"]:
+            print("Available commands:")
+            print(" - 'exit' or 'quit' to quit")
+            print(" - 'h', '?' or 'help' to show this help message")
+            print(" - 'r' or 'releases' to list all available releases")
+            print(" - 's' or 'snapshots' to list all available releases")
+            continue
+
+        if version in ["r", "releases", "release"]:
+            dump_versions(versions["releases"])
+            continue
+
+        if version in ["s", "snapshots", "snapshot"]:
+            dump_versions(versions["snapshots"])
+            continue
+
+        for _type in versions:
+            if version in versions[_type]:
+                selected_version = version
+                selected_data = versions[_type][version]
+                break
+
+        if not selected_version:
+            print("Invalid version. Please try again.")
+
+    return selected_data
+
+def read_minecraft_piston_api():
+    """Downloads and extracts Minecraft font assets and unifont fallbacks via the Piston API."""
+    print(f"🧩 Processing minecraft piston data...")
+    version_json = select_minecraft_version()
+    version_data = fetch_json(version_json["url"], label="version metadata")
+
+    if "assetIndex" not in version_data:
+        raise RuntimeError("→ ❌ Missing asset index in version data.")
+
+    # Download and extract client JAR
+    jar_data = BytesIO(fetch_bytes(version_data["downloads"]["client"]["url"], label="client.jar"))
+    #save_jar_to_disk(jar_data, WORK_DIR)
+    files = extract_font_assets(jar_data, WORK_DIR)
+
+    matched_file = None
+    matched_format = None
+    for file in files:
+        if MINECRAFT_BIN_FILE.endswith(file):
+            matched_file = MINECRAFT_BIN_FILE
+            matched_format = "bin"
+        elif MINECRAFT_JSON_FILE.endswith(file):
+            matched_file = MINECRAFT_JSON_FILE
+            matched_format = "json"
+
+        if matched_file:
+            print(f"→ 🔢 Detected {matched_format} format...")
+            break
+
+    if not matched_file:
+        print("→ ❌ Could not detect font assets format.")
+
+    # Download unifont fallback glyphs
+    unifont_glyphs = None
+    if UNIFONT:
+        asset_index = fetch_json(version_data["assetIndex"]["url"], label="asset index")
+        unifont_objects, size_overrides = find_unifont_objects(asset_index)
+        unifont_glyphs = read_unifont_glyphs(unifont_objects)
+
+    return matched_file, matched_format, unifont_glyphs
