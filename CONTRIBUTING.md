@@ -18,11 +18,6 @@ project follows.
 - [Project Architecture](#project-architecture)
 - [Legal](#legal)
 
-## Code of Conduct
-
-This project follows the [Contributor Covenant 3.0 Code of Conduct](.github/CODE_OF_CONDUCT.md).
-Please read it before participating.
-
 ## Getting Started
 
 ### Prerequisites
