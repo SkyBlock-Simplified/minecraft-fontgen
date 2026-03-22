@@ -8,24 +8,19 @@ Convert Minecraft's bitmap font glyphs into fully functional OpenType (`.otf`) o
 ## Table of Contents
 
 - [Features](#features)
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
-  - [Clone the Repository](#clone-the-repository)
-  - [Create a Virtual Environment](#create-a-virtual-environment)
-  - [Install Dependencies](#install-dependencies)
-- [Usage](#usage)
-  - [Interactive Mode](#interactive-mode)
-  - [Non-Interactive Mode](#non-interactive-mode)
+- [Getting Started](#getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Installation](#installation)
+  - [Usage](#usage)
   - [CLI Arguments](#cli-arguments)
   - [Environment Variables](#environment-variables)
-  - [The .env File](#the-env-file)
-  - [Configuration Priority](#configuration-priority)
 - [Output](#output)
+- [Unicode Coverage](#unicode-coverage)
 - [Docker Compose](#docker-compose)
   - [Basic One-Shot Task](#basic-one-shot-task)
-  - [Multi-Service Example](#multi-service-example)
   - [Running the Task](#running-the-task)
 - [How It Works](#how-it-works)
+  - [Glyph Processing](#glyph-processing)
 - [Project Structure](#project-structure)
 - [Contributing](#contributing)
 - [License](#license)
@@ -41,7 +36,9 @@ Convert Minecraft's bitmap font glyphs into fully functional OpenType (`.otf`) o
 - **Debug SVG output** - Optionally dump per-glyph SVG files for visual inspection
 - **Non-interactive mode** - Fully scriptable with CLI arguments and environment variables for CI/CD and Docker workflows
 
-## Prerequisites
+## Getting Started
+
+### Prerequisites
 
 | Requirement | Version | Notes |
 |-------------|---------|-------|
@@ -49,16 +46,14 @@ Convert Minecraft's bitmap font glyphs into fully functional OpenType (`.otf`) o
 | pip | Latest | Included with Python |
 | [Git](https://git-scm.com/) | 2.x+ | For cloning the repository |
 
-## Installation
+### Installation
 
-### Clone the Repository
+Clone the repository and create a virtual environment:
 
 ```bash
 git clone https://github.com/SkyBlock-Simplified/minecraft-fontgen.git
 cd minecraft-fontgen
 ```
-
-### Create a Virtual Environment
 
 <details>
 <summary>Linux / macOS</summary>
@@ -80,8 +75,6 @@ python -m venv .venv
 
 </details>
 
-### Install Dependencies
-
 Install in **editable mode** (recommended for development):
 
 ```bash
@@ -94,9 +87,9 @@ Or install dependencies directly:
 pip install -r requirements.txt
 ```
 
-## Usage
+### Usage
 
-### Interactive Mode
+#### Interactive Mode
 
 When no `--version` flag or `FONTGEN_VERSION` env var is set, the tool launches
 an interactive prompt where you can search and select a Minecraft version:
@@ -115,7 +108,7 @@ The interactive prompt supports the following commands:
 | `h`, `?`, or `help` | Show help |
 | `exit` or `quit` | Exit the tool |
 
-### Non-Interactive Mode
+#### Non-Interactive Mode
 
 For automation, CI/CD pipelines, or Docker, provide the Minecraft version
 upfront to skip the interactive prompt entirely:
@@ -181,7 +174,8 @@ export FONTGEN_SILENT=true
 python -m minecraft_fontgen
 ```
 
-### The .env File
+<details>
+<summary>The <code>.env</code> file and configuration priority</summary>
 
 You can create a `.env` file in the project root to set defaults without
 modifying your shell environment. The file is loaded automatically at startup.
@@ -197,9 +191,7 @@ FONTGEN_SILENT=false
 Values from `.env` will **not** overwrite variables that already exist in your
 shell environment.
 
-### Configuration Priority
-
-Values are resolved in this order (highest priority first):
+Configuration values are resolved in this order (highest priority first):
 
 ```
 CLI argument  >  Shell environment variable  >  .env file  >  config.py defaults
@@ -208,6 +200,8 @@ CLI argument  >  Shell environment variable  >  .env file  >  config.py defaults
 For example, if `FONTGEN_OUTPUT=dist` is in your `.env` but you run
 `python -m minecraft_fontgen --output build`, the output directory will be
 `build`.
+
+</details>
 
 ## Output
 
@@ -224,6 +218,72 @@ output/
 The file extension is `.otf` for OpenType (CFF) or `.ttf` for TrueType,
 controlled by the `OPENTYPE` constant in
 [`config.py`](src/minecraft_fontgen/config.py).
+
+## Unicode Coverage
+
+The generated fonts include glyphs from Minecraft's bitmap providers and
+optionally from [GNU Unifont](https://unifoundry.com/unifont/) as a fallback.
+
+> [!NOTE]
+> Provider glyphs from Minecraft's bitmap PNGs are always included regardless
+> of the ranges below. These ranges control which additional glyphs are pulled
+> from GNU Unifont (1.13+) and which codepoints are included from
+> `glyph_sizes.bin` (1.12.2 and earlier). To customize coverage, edit
+> `UNIFONT_RANGES` in [`config.py`](src/minecraft_fontgen/config.py).
+
+<details>
+<summary>Unicode block coverage (<code>UNIFONT_RANGES</code>)</summary>
+
+| Unicode Block | Range | Status |
+|---------------|-------|--------|
+| Basic Latin | U+0000–U+007F | ✅ Included |
+| Latin-1 Supplement | U+0080–U+00FF | ✅ Included |
+| Latin Extended-A/B | U+0100–U+024F | ✅ Included |
+| IPA Extensions | U+0250–U+02AF | ✅ Included |
+| Spacing Modifier Letters | U+02B0–U+02FF | ✅ Included |
+| Combining Diacritical Marks | U+0300–U+036F | ✅ Included |
+| Greek and Coptic | U+0370–U+03FF | ✅ Included |
+| Cyrillic / Supplement | U+0400–U+052F | ✅ Included |
+| Armenian | U+0530–U+058F | ✅ Included |
+| Hebrew | U+0590–U+05FF | ✅ Included |
+| Arabic / Supplement | U+0600–U+077F | ✅ Included |
+| Syriac | U+0700–U+074F | ✅ Included |
+| Thaana | U+0780–U+07BF | ✅ Included |
+| NKo | U+07C0–U+07FF | ✅ Included |
+| Devanagari | U+0900–U+097F | ❌ Excluded |
+| Bengali / Gurmukhi / Gujarati | U+0980–U+0AFF | ❌ Excluded |
+| Tamil / Telugu / Kannada / Malayalam | U+0B00–U+0D7F | ❌ Excluded |
+| Sinhala | U+0D80–U+0DFF | ❌ Excluded |
+| Thai | U+0E00–U+0E7F | ✅ Included |
+| Lao / Tibetan / Myanmar | U+0E80–U+109F | ❌ Excluded |
+| Georgian | U+10A0–U+10FF | ✅ Included |
+| Hangul Jamo | U+1100–U+11FF | ✅ Included |
+| Ethiopic | U+1200–U+137F | ❌ Excluded |
+| Cherokee / Unified Canadian Aboriginal | U+13A0–U+167F | ❌ Excluded |
+| Ogham / Runic | U+1680–U+16FF | ❌ Excluded |
+| Khmer / Mongolian | U+1780–U+18AF | ❌ Excluded |
+| Phonetic Extensions + Supplement | U+1D00–U+1DFF | ✅ Included |
+| Latin Extended Additional | U+1E00–U+1EFF | ✅ Included |
+| Greek Extended | U+1F00–U+1FFF | ✅ Included |
+| General Punctuation through Misc Symbols | U+2000–U+2BFF | ✅ Included |
+| Glagolitic / Latin Extended-C | U+2C00–U+2C7F | ✅ Included |
+| Coptic | U+2C80–U+2CFF | ✅ Included |
+| Supplemental Punctuation | U+2E00–U+2E7F | ✅ Included |
+| CJK Radicals / Kangxi / Ideographs | U+2E80–U+9FFF | ❌ Excluded |
+| Yi Syllables / Radicals | U+A000–U+A4CF | ❌ Excluded |
+| Latin Extended-D | U+A720–U+A7FF | ✅ Included |
+| Latin Extended-E | U+AB30–U+AB6F | ✅ Included |
+| Hangul Syllables | U+AC00–U+D7AF | ❌ Excluded |
+| Surrogates / Private Use Area | U+D800–U+F8FF | ❌ Excluded |
+| CJK Compatibility Ideographs | U+F900–U+FAFF | ❌ Excluded |
+| Latin Ligatures (Alphabetic Presentation) | U+FB00–U+FB06 | ✅ Included |
+| Arabic Presentation Forms-A/B | U+FB50–U+FDFB | ❌ Excluded |
+| Combining Half Marks | U+FE20–U+FE2F | ✅ Included |
+| Small Form Variants | U+FE50–U+FE6F | ✅ Included |
+| Fullwidth ASCII | U+FF01–U+FF5E | ✅ Included |
+| Specials | U+FFF0–U+FFFD | ✅ Included |
+
+</details>
 
 ## Docker Compose
 
@@ -246,18 +306,20 @@ Add this service to your project's `docker-compose.yml`:
 services:
   fontgen:
     image: python:3.14-slim
+    user: "1000:1000"
     working_dir: /build
     environment:
       FONTGEN_VERSION: "1.21.4"
       FONTGEN_STYLES: "regular,bold"
       FONTGEN_SILENT: "true"
       FONTGEN_OUTPUT: "/output"
+      PATH: "/home/fontgen/.local/bin:$PATH"
     volumes:
       - fonts:/output
     entrypoint: ["bash", "-c"]
     command:
       - |
-        pip install --quiet git+https://github.com/SkyBlock-Simplified/minecraft-fontgen.git &&
+        pip install --user --quiet git+https://github.com/SkyBlock-Simplified/minecraft-fontgen.git &&
         minecraft-fontgen
     profiles:
       - build
@@ -270,27 +332,27 @@ volumes:
 > The `profiles: [build]` setting prevents this service from starting during a
 > normal `docker compose up`. It only runs when explicitly invoked.
 
-### Multi-Service Example
-
-Here's a more complete example where a Discord bot service depends on the
-generated fonts:
+<details>
+<summary>Multi-service example (bot depends on font generation)</summary>
 
 ```yaml
 services:
   fontgen:
     image: python:3.14-slim
+    user: "1000:1000"
     working_dir: /build
     environment:
       FONTGEN_VERSION: "1.21.4"
       FONTGEN_STYLES: "regular,bold"
       FONTGEN_SILENT: "true"
       FONTGEN_OUTPUT: "/output"
+      PATH: "/home/fontgen/.local/bin:$PATH"
     volumes:
       - fonts:/output
     entrypoint: ["bash", "-c"]
     command:
       - |
-        pip install --quiet git+https://github.com/SkyBlock-Simplified/minecraft-fontgen.git &&
+        pip install --user --quiet git+https://github.com/SkyBlock-Simplified/minecraft-fontgen.git &&
         minecraft-fontgen
 
   bot:
@@ -311,6 +373,8 @@ In this setup:
 - `fontgen` runs first, compiles the fonts into the shared `fonts` volume, then exits.
 - `bot` waits for `fontgen` to complete successfully before starting.
 - The `bot` service mounts the same volume as read-only (`:ro`) at `/app/fonts`.
+
+</details>
 
 ### Running the Task
 
@@ -348,10 +412,13 @@ The tool runs a five-stage pipeline:
                downloads the client JAR, extracts font assets, and optionally
                downloads GNU Unifont hex files
        ↓
-3. Parse       Reads font provider JSON from the extracted JAR, discovers
-               bitmap PNG textures and Unicode character mappings, then slices
-               individual glyphs from the bitmap sheets using flood-fill
-               contour tracing
+3. Parse       Detects the font asset format and parses accordingly:
+               - JSON (1.13+): Reads default.json font providers with
+                 explicit Unicode character mappings
+               - Binary (1.12.2 and earlier): Reads glyph_sizes.bin
+                 width data and unicode_page_XX.png / ascii.png textures
+               Slices individual glyphs from the bitmap sheets using
+               flood-fill contour tracing
        ↓
 4. Build       Merges provider glyphs (high priority) with unifont fallback
                glyphs (low priority) into a unified glyph map, keyed by
@@ -406,7 +473,7 @@ minecraft-fontgen/
 │       └── truetype.py            # glyf/loca tables
 ├── pyproject.toml
 ├── requirements.txt
-├── LICENSE
+├── LICENSE.md
 ├── COPYRIGHT.md
 ├── CONTRIBUTING.md
 └── CLAUDE.md
