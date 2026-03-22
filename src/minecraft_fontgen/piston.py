@@ -5,16 +5,8 @@ import zipfile
 
 from io import BytesIO
 
-from minecraft_fontgen.config import MINECRAFT_MANIFEST_URL, MINECRAFT_BIN_FILE, MINECRAFT_JSON_FILE, WORK_DIR, UNIFONT_PATH, UNIFONT, UNIFONT_RANGES
-from minecraft_fontgen.functions import fetch_bytes, fetch_json, fetch_minecraft_resource, fetch_minecraft_resource_bytes, log
-
-def in_unifont_ranges(codepoint):
-    """Returns True if the codepoint falls within any configured UNIFONT_RANGES."""
-    for start, end in UNIFONT_RANGES:
-        if start <= codepoint <= end:
-            return True
-
-    return False
+from minecraft_fontgen.config import MINECRAFT_MANIFEST_URL, MINECRAFT_BIN_FILE, MINECRAFT_JSON_FILE, WORK_DIR, UNIFONT_PATH, UNIFONT
+from minecraft_fontgen.functions import fetch_bytes, fetch_json, fetch_minecraft_resource, fetch_minecraft_resource_bytes, in_unifont_ranges, log
 
 def extract_font_assets(jar_data, output_path):
     """Extracts font-related files (default.json, font textures) from the Minecraft JAR."""
@@ -253,11 +245,14 @@ def read_minecraft_piston_api(mc_version=None):
     if not matched_file:
         log("→ ❌ Could not detect font assets format.")
 
-    # Download unifont fallback glyphs
+    # Download unifont fallback glyphs (not available in older versions)
     unifont_glyphs = None
     if UNIFONT:
-        asset_index = fetch_json(version_data["assetIndex"]["url"], label="asset index")
-        unifont_objects, size_overrides = find_unifont_objects(asset_index)
-        unifont_glyphs = read_unifont_glyphs(unifont_objects)
+        try:
+            asset_index = fetch_json(version_data["assetIndex"]["url"], label="asset index")
+            unifont_objects, size_overrides = find_unifont_objects(asset_index)
+            unifont_glyphs = read_unifont_glyphs(unifont_objects)
+        except RuntimeError:
+            log("→ ⚠️ Unifont not available for this version, skipping...")
 
     return matched_file, matched_format, unifont_glyphs
