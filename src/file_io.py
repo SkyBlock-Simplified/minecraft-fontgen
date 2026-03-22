@@ -4,22 +4,22 @@ import shutil
 import sys
 import numpy as np
 
-from collections import deque
+from collections import deque, OrderedDict
 from tqdm import tqdm
 from PIL import Image
-from src.config import COLUMNS_PER_ROW, DEFAULT_GLYPH_SIZE, OUTPUT_DIR, MINECRAFT_JAR_DIR, MINECRAFT_BIN_FILE, MINECRAFT_JSON_FILE, WORK_DIR
-from src.functions import get_unicode_codepoint, fetch_minecraft_versions, fetch_minecraft_client_jar_url, fetch_minecraft_jar_data, extract_font_assets, get_font_type, save_jar_to_disk, fetch_minecraft_version_entry, \
-    fetch_minecraft_asset_index
+from src.config import COLUMNS_PER_ROW, DEFAULT_GLYPH_SIZE, OUTPUT_DIR, MINECRAFT_JAR_DIR, WORK_DIR, UNIFONT_DEBUG_SVG, UNITS_PER_EM
+from src.functions import get_unicode_codepoint, get_font_type
 
 
 def convert_tile_into_svg(tile):
+    """Generates SVG debug output for both regular and bold styles of a tile."""
     return {
         "regular": _convert_tile_into_svg(tile, False),
         "bold": _convert_tile_into_svg(tile, True)
     }
 
 def _convert_tile_into_svg(tile, bold: bool = False, italic: bool = False):
-    # Read image
+    """Renders a single tile's pixel grid as an SVG file with 1x1 rect elements."""
     width, height = tile["size"]
     gtype = get_font_type(bold, italic)
 
@@ -52,15 +52,17 @@ def _convert_tile_into_svg(tile, bold: bool = False, italic: bool = False):
     return svg
 
 def convert_tile_into_pixels(tile):
+    """Converts a tile's bitmap image to pixel data for both regular and bold styles."""
     return {
         "regular": _convert_tile_into_pixels(tile, False),
         "bold": _convert_tile_into_pixels(tile, True)
     }
 
-def _convert_tile_into_pixels(tile, bold: bool = False):
-    # Convert image to pixel grid
-    bitmap_grid = np.array(tile["bitmap"]["image"].convert("L"), dtype=int) # White (255) / Black (0)
-    bitmap_grid = (bitmap_grid < 128).astype(np.uint8) # White (0) / Black (1)
+def _bitmap_to_pixel_data(bitmap_grid, bold: bool = False):
+    """Traces contours from a binary bitmap grid using flood-fill labeling and right-hand edge
+    tracing. Returns pixel data with labeled grid, path corners, hole corners, advance width,
+    and left side bearing for font glyph construction.
+    """
     height, width = bitmap_grid.shape
     pixel_grid = np.full((height, width), -999, dtype=int) # Create empty grid
 
@@ -223,8 +225,14 @@ def _convert_tile_into_pixels(tile, bold: bool = False):
         "holes": {label: get_path_data(pixel_grid, label) for label in hole_labels}
     }
 
+def _convert_tile_into_pixels(tile, bold: bool = False):
+    """Converts a tile's PIL bitmap image to a binary numpy grid and processes it into pixel data."""
+    bitmap_grid = np.array(tile["bitmap"]["image"].convert("L"), dtype=int)
+    bitmap_grid = (bitmap_grid < 128).astype(np.uint8)
+    return _bitmap_to_pixel_data(bitmap_grid, bold)
+
 def crop_tile_from_bitmap(bitmap, tile):
-    # Crop tile from bitmap
+    """Crops a single glyph tile from a full provider bitmap and saves it to disk."""
     x, y = tile["location"]
     width, height = tile["size"]
     px, py = (x * DEFAULT_GLYPH_SIZE, y * height)
@@ -240,6 +248,7 @@ def crop_tile_from_bitmap(bitmap, tile):
     return bitmap
 
 def read_provider_bitmap(provider):
+    """Reads a provider PNG, composites over black, inverts to black-on-white, and binarizes."""
     img = Image.open(provider["file_path"]).convert("RGBA")
 
     # Composite white glyphs over black background
@@ -260,10 +269,11 @@ def read_provider_bitmap(provider):
     return img
 
 def slice_providers_into_tiles(providers):
-    print(f"✂️ Slicing bitmap providers into tiles...")
+    """Slices each provider's bitmap PNG into individual glyph tiles with pixel and SVG data."""
+    print(f"→ ✂️ Slicing bitmap providers into tiles...")
 
     for provider in providers:
-        print(f"→ 🖼️ Reading '{provider['file_name']}'...")
+        print(f" → 🖼️ Reading {provider['file_name']}...")
         bitmap = read_provider_bitmap(provider)
         tiles = []
 
@@ -308,6 +318,7 @@ def slice_providers_into_tiles(providers):
         provider["tiles"] = tiles
 
 def read_providers_from_bin(byte_data):
+    """Parses legacy binary glyph_sizes.bin format (stub, not fully implemented)."""
     glyph_widths = list(byte_data)
 
     # # Check length (should be 256 for 16x16 fonts)
@@ -322,6 +333,7 @@ def read_providers_from_bin(byte_data):
     return None
 
 def read_providers_from_json(byte_data):
+    """Parses the JSON font provider format (default.json) into a list of provider dicts."""
     raw_text = byte_data.decode("utf-8", errors="surrogatepass")
     data = json.loads(raw_text)
 
@@ -354,104 +366,139 @@ def read_providers_from_json(byte_data):
     return providers
 
 def read_providers_from_file(file, format):
-    print(f"🧩 Parsing '{file}'...")
+    """Reads a font provider file, parses it by format, and slices into glyph tiles."""
+    print(f"🧩 Parsing {file}...")
     with open(file, "rb") as f:
         raw_bytes = f.read()
 
     print(f"→ 🛠️ Decoding {format}...")
     if format == "bin":
-        return read_providers_from_bin(raw_bytes)
+        providers = read_providers_from_bin(raw_bytes)
     elif format == "json":
-        return read_providers_from_json(raw_bytes)
+        providers = read_providers_from_json(raw_bytes)
     else:
         raise ValueError(f"Unsupported file format: {format}")
 
-def get_minecraft_assets():
-    versions = fetch_minecraft_versions()
-    selected_version = None
-    selected_data = None
+    slice_providers_into_tiles(providers)
+    return providers
 
-    while selected_version is None:
-        version = input("Enter version number (or 'help'): ").strip().lower()
+def convert_unifont_to_tiles(unifont_glyphs, bold=False):
+    """Converts parsed unifont hex bitmap data into tile dicts with pixel data."""
+    tiles = {}
+    style_label = "Bold" if bold else "Regular"
 
-        def dump_versions(versions):
-            #print(f"Found {len(versions)}:")
+    with tqdm(unifont_glyphs.items(), total=len(unifont_glyphs),
+              desc=f" → 🔣 {style_label}", unit="glyph",
+              ncols=80, leave=False, file=sys.stdout) as progress:
+        for codepoint, bitmap_rows in progress:
+            bitmap_grid = np.array(bitmap_rows, dtype=np.uint8)
+            pixel_data = _bitmap_to_pixel_data(bitmap_grid, bold)
+            width = len(bitmap_rows[0]) if bitmap_rows else 8
+            tiles[codepoint] = {
+                "unicode": chr(codepoint),
+                "codepoint": codepoint,
+                "size": (width, 16),
+                "ascent": 15,
+                "pixels": pixel_data,
+                "svg": None,
+                "source": "unifont"
+            }
 
-            for i, (version, _) in enumerate(versions.items(), 1):
-                tabs = '\t' * (1 if len(version) > 3 else 2)
-                print(version, end=tabs)
+    return tiles
 
-                if i % 15 == 0:
-                    print()  # Newline after every 15 items
+def precompute_glyph_scaling(glyph_map):
+    """Pre-computes base scaled coordinates (pixel space to font units) for all glyphs."""
+    styles = len(glyph_map)
+    per_style = len(next(iter(glyph_map.values())))
+    total = per_style * styles
+    print(f"→ ✖️ Pre-scaling {per_style} glyphs ({styles} styles)...")
 
-            # Final newline if needed
-            if len(versions) % 15 != 0:
-                print()
+    with tqdm(total=total, desc=" → 🔣 Scaling", unit="glyph",
+              ncols=80, leave=False, file=sys.stdout) as progress:
+        for style_key in glyph_map:
+            for cp, tile in glyph_map[style_key].items():
+                progress.update(1)
+                pixels = tile.get("pixels")
+                if not pixels:
+                    tile["scaled"] = {"outer": [], "holes": []}
+                    continue
 
-        if version in ["exit", "leave", "quit", "stop"]:
-            print("Exiting...")
-            break
+                paths = pixels.get("paths", {})
+                holes = pixels.get("holes", {})
 
-        if version in ["h", "?", "help"]:
-            print("Available commands:")
-            print(" - 'exit' or 'quit' to quit")
-            print(" - 'h', '?' or 'help' to show this help message")
-            print(" - 'r' or 'releases' to list all available releases")
-            print(" - 's' or 'snapshots' to list all available releases")
-            continue
+                outer_paths = [p["corners"] for p in paths.values() if len(p.get("corners", [])) >= 3]
+                hole_paths = [h["corners"] for h in holes.values() if len(h.get("corners", [])) >= 3]
 
-        if version in ["r", "releases", "release"]:
-            dump_versions(versions["releases"])
-            continue
+                all_points = [pt for path in outer_paths + hole_paths for pt in path]
+                if not all_points:
+                    tile["scaled"] = {"outer": [], "holes": []}
+                    continue
 
-        if version in ["s", "snapshots", "snapshot"]:
-            dump_versions(versions["snapshots"])
-            continue
+                min_x = min(x for x, y in all_points)
+                width, height = tile["size"]
+                scale_x = UNITS_PER_EM / width
+                scale_y = UNITS_PER_EM / height
+                descender_offset = height - 1
 
-        for type in versions:
-            if version in versions[type]:
-                selected_version = version
-                selected_data = versions[type][version]
-                break
+                def transform(pt, _min_x=min_x, _sx=scale_x, _sy=scale_y, _do=descender_offset):
+                    x, y = pt
+                    return ((x - _min_x) * _sx, (_do - y) * _sy)
 
-        if not selected_version:
-            print("Invalid version. Please try again.")
+                tile["scaled"] = {
+                    "outer": [[transform(pt) for pt in path] for path in outer_paths],
+                    "holes": [[transform(pt) for pt in path] for path in hole_paths]
+                }
 
-    version_data = fetch_minecraft_version_entry(selected_version, selected_data["url"])
+def build_glyph_map(providers, unifont_glyphs):
+    """Builds a unified glyph map merging provider glyphs (priority) with unifont fallbacks."""
+    print(f"🧩 Building unified glyph map...")
+    glyph_map = {"Regular": OrderedDict(), "Bold": OrderedDict()}
 
-    asset_index = version_data["assetIndex"]
-    if not asset_index:
-        raise RuntimeError("Missing asset index in version data.")
+    # 1. Add provider glyphs (priority - added first)
+    for provider in providers:
+        for tile in provider["tiles"]:
+            cp = tile["codepoint"]
+            for style_key in ("Regular", "Bold"):
+                style = style_key.lower()
+                flat_tile = {
+                    "unicode": tile["unicode"],
+                    "codepoint": cp,
+                    "size": tile["size"],
+                    "ascent": tile["ascent"],
+                    "pixels": tile["pixels"][style],
+                    "svg": tile["svg"][style] if tile.get("svg") else None,
+                    "source": "provider"
+                }
+                glyph_map[style_key][cp] = flat_tile
 
-    asset_index_data = fetch_minecraft_asset_index(asset_index)
-    # TODO: unifont loading
+    provider_count = len(glyph_map["Regular"])
+    print(f"→ 🔣 {provider_count} provider glyphs (priority)")
 
-    jar_url = fetch_minecraft_client_jar_url(selected_data["url"])
-    jar_data = fetch_minecraft_jar_data(jar_url)
-    save_jar_to_disk(jar_data, WORK_DIR)
+    # 2. Add unifont glyphs (fallback - skip if codepoint exists)
+    if unifont_glyphs:
+        print(f"→ 🔣 Processing unifont fallback glyphs...")
+        for style_key, bold in [("Regular", False), ("Bold", True)]:
+            unifont_tiles = convert_unifont_to_tiles(unifont_glyphs, bold)
+            for cp, tile in unifont_tiles.items():
+                if cp not in glyph_map[style_key]:
+                    glyph_map[style_key][cp] = tile
 
-    print("→ 📦 Extracting font assets...")
-    files = extract_font_assets(jar_data, WORK_DIR)
-    matched_file = None
-    matched_format = None
-    for file in files:
-        if MINECRAFT_BIN_FILE.endswith(file):
-            matched_file = MINECRAFT_BIN_FILE
-            matched_format = "bin"
-        elif MINECRAFT_JSON_FILE.endswith(file):
-            matched_file = MINECRAFT_JSON_FILE
-            matched_format = "json"
+    # 3. Sort by codepoint
+    for key in glyph_map:
+        glyph_map[key] = OrderedDict(sorted(glyph_map[key].items()))
 
-        if matched_file:
-            print(f"→ 📂 Detected {matched_format} format...")
-            break
+    # 4. Print summary
+    unifont_count = sum(1 for t in glyph_map["Regular"].values() if t["source"] == "unifont")
+    total = len(glyph_map["Regular"])
+    print(f"→ 🔢 Prepared {total} glyphs ({provider_count} provider, {unifont_count} unifont)")
 
-    if not matched_file:
-        print("→ ❌ Could not detect font assets format.")
+    # 5. Pre-compute scaling
+    precompute_glyph_scaling(glyph_map)
 
-    return matched_file, matched_format
+    return glyph_map
 
 def clean_directories():
+    """Removes and recreates the work/ and output/ directories."""
     print("🧹 Cleaning work directory...")
     shutil.rmtree(WORK_DIR, ignore_errors=True)
     os.makedirs(WORK_DIR, exist_ok=True)
