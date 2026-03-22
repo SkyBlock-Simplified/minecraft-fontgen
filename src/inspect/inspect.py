@@ -2,6 +2,7 @@ import os
 import subprocess
 
 def inspect_font_file(output_path):
+    """Runs FontForge validation on a font file via subprocess."""
     print(f"🕵️ Inspecting font...")
     result = subprocess.run(
         [
