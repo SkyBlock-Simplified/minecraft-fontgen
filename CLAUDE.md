@@ -21,11 +21,25 @@ pip install -e .
 # Run the tool (interactive - prompts for Minecraft version)
 python -m minecraft_fontgen
 
+# Run non-interactively
+python -m minecraft_fontgen --version 1.21.4 --styles regular,bold --output dist/fonts --silent
+
 # Validate output with FontForge (requires fontforge installed)
 fontforge -lang=py -script scripts/validate_font.py output/Minecraft-Regular.otf
 ```
 
 There are no tests or linting configured.
+
+### CLI Arguments and Environment Variables
+
+`parse_args()` in `cli.py` resolves configuration with this priority: CLI arg > shell env var > `.env` file > `config.py` defaults.
+
+| CLI Argument | Env Var | Description | Default |
+|---|---|---|---|
+| `--version` | `FONTGEN_VERSION` | Minecraft version (skips interactive prompt when set) | `None` (interactive) |
+| `--output` | `FONTGEN_OUTPUT` | Output directory for font files | `output` |
+| `--styles` | `FONTGEN_STYLES` | Comma-separated styles: `regular,bold,italic,bolditalic` | All enabled in `config.py` |
+| `--silent` | `FONTGEN_SILENT` | Suppress output (`1`/`true`/`yes`) | `False` |
 
 ## Architecture
 
@@ -34,7 +48,7 @@ There are no tests or linting configured.
 The pipeline runs sequentially through five stages:
 
 1. **Clean** (`minecraft_fontgen.file_io:clean_directories`) - Wipes and recreates `work/` and `output/` directories
-2. **Download** (`minecraft_fontgen.piston:read_minecraft_piston_api`) - User selects a Minecraft version interactively. Downloads version manifest, client JAR, and extracts font assets to `work/`. Then downloads unifont hex files if enabled. Returns the matched font file path, format, and unifont glyph data
+2. **Download** (`minecraft_fontgen.piston:read_minecraft_piston_api`) - Selects a Minecraft version (non-interactively via `--version`/`FONTGEN_VERSION`, or interactively via prompt). Downloads version manifest, client JAR, and extracts font assets to `work/`. Then downloads unifont hex files if enabled. Returns the matched font file path, format, and unifont glyph data
 3. **Parse + Slice** (`minecraft_fontgen.file_io:read_providers_from_file`) - Reads `include/default.json` from the extracted JAR to discover bitmap font providers (PNG files + Unicode character mappings). Internally calls `slice_providers_into_tiles` to crop individual glyphs from bitmap PNGs, build pixel grids with flood-fill contour tracing, and generate SVG debug output
 4. **Build glyph map** (`minecraft_fontgen.file_io:build_glyph_map`) - Merges provider glyphs (priority) with unifont fallback glyphs into an `OrderedDict` keyed by codepoint, per style (Regular/Bold). Pre-computes scaled coordinates (pixel space to font units) for all glyphs via `precompute_glyph_scaling`
 5. **Create font files** (`minecraft_fontgen.font_creator:create_font_files`) - Batch creates all enabled font styles (Regular, Bold, Italic, BoldItalic). Initializes fontTools `TTFont` tables for each style, converts glyphs with a single progress bar across all styles, then finalizes and saves all fonts
