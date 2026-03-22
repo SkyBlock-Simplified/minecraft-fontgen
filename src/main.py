@@ -1,21 +1,32 @@
-from src.file_io import clean_directories, slice_providers_into_tiles, read_providers_from_file
-from src.font_creator import create_font_file
-from src.config import OUTPUT_FONT_FILE, OPENTYPE, OUTPUT_FONTS, OUTPUT_FONT_EXT
-from src.file_io import get_minecraft_assets
+import sys
+import io
+
+from src.piston import read_minecraft_piston_api
+from src.file_io import clean_directories, read_providers_from_file, build_glyph_map
+from src.font_creator import create_font_files
+from src.config import OPENTYPE, OUTPUT_DIR, OUTPUT_FONT_EXT, OUTPUT_FONT_NAME, OUTPUT_FONTS
+
+# Force UTF-8 output to handle emoji in print statements
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 def main():
+    """Runs the font generation pipeline: download, parse, build glyph map, create fonts."""
     clean_directories()
-    matched_file, matched_format = get_minecraft_assets()
+
+    # Download MC version, extract unifont + JAR assets
+    matched_file, matched_format, unifont_glyphs = read_minecraft_piston_api()
+
+    # Parse provider glyphs from JAR bitmap PNGs (includes slicing)
     providers = read_providers_from_file(matched_file, matched_format)
-    slice_providers_into_tiles(providers)
 
-    for font in OUTPUT_FONTS:
-        glyph_storage = create_font_file(providers, OPENTYPE, font[1], font[2])
-        output_file = f"{OUTPUT_FONT_FILE}-{font[0]}.{OUTPUT_FONT_EXT}"
-        glyph_storage.save(output_file)
-        #inspect_font_file(output_file)
+    # Build unified glyph map with pre-computed scaling
+    glyph_map = build_glyph_map(providers, unifont_glyphs)
 
-    print("✨ Done.")
+    # Generate all font files
+    create_font_files(glyph_map, OPENTYPE, OUTPUT_FONTS, OUTPUT_DIR, OUTPUT_FONT_NAME, OUTPUT_FONT_EXT)
+
+    print("Done.")
 
 if __name__ == "__main__":
     main()
