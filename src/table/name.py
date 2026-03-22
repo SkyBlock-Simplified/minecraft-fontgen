@@ -3,7 +3,7 @@ from fontTools.ttLib.tables._n_a_m_e import makeName
 from src.functions import get_font_type
 
 from src.config import (
-    FONT_NAME, VERSION,
+    OUTPUT_FONT_NAME, VERSION,
     MANUFACTURER, DESIGNER,
     VENDOR_URL, DESIGNER_URL,
     DESCRIPTION, COPYRIGHT,
@@ -30,32 +30,33 @@ _PLATFORMS = [
 ]
 
 def _add(name_table, name_id, text):
+    """Appends a name record across all configured platforms (Windows, Mac, Unicode)."""
     if text is None:
         return
     for (plat, enc, lang) in _PLATFORMS:
         name_table.names.append(makeName(text, name_id, plat, enc, lang))
 
 def create_font_name_table(font, bold = False, italic = False):
-    print("→ 📄 Generating name table...")
+    """Creates the 'name' table with font family, style, version, and metadata strings."""
     name = font["name"] = newTable("name")
     name.names = []
     gtype = get_font_type(bold, italic)
 
-    family      = f"{FONT_NAME} Font"                 # NameID 1
+    family      = f"{OUTPUT_FONT_NAME} Font"                 # NameID 1
     subfamily   = gtype                               # NameID 2
-    full_name   = f"{FONT_NAME} Font {gtype}"         # NameID 4
+    full_name   = f"{OUTPUT_FONT_NAME} Font {gtype}"         # NameID 4
     version_str = f"Version {VERSION}"                # NameID 5
-    ps_name     = _ps_sanitize(f"{FONT_NAME}{gtype}") # NameID 6
+    ps_name     = _ps_sanitize(f"{OUTPUT_FONT_NAME}{gtype}") # NameID 6
 
     # Recommended “typographic” names (IDs 16/17) mirror 1/2 for simple families
-    typo_family    = f"{FONT_NAME}"                   # Often just brand family without "Font"
+    typo_family    = f"{OUTPUT_FONT_NAME}"                   # Often just brand family without "Font"
     typo_subfamily = gtype
 
     # Unique font identifier (NameID 3) — common format: “Version X;Manufacturer;Family Subfamily”
     unique_id = f"{version_str};{MANUFACTURER or 'Unknown'};{full_name}"
 
     # Core required/expected
-    _add(name, 0,  COPYRIGHT or f"Copyright © {MANUFACTURER or FONT_NAME} {VERSION}")
+    _add(name, 0, COPYRIGHT or f"Copyright © {MANUFACTURER or OUTPUT_FONT_NAME} {VERSION}")
     _add(name, 1,  family)
     _add(name, 2,  subfamily)
     _add(name, 3,  unique_id)

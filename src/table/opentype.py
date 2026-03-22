@@ -4,12 +4,12 @@ from fontTools.cffLib import (
     PrivateDict, FontDict, FDSelect, CharStrings
 )
 
-from src.config import FONT_NAME, BOUNDING_BOX, UNITS_PER_EM
+from src.config import OUTPUT_FONT_NAME, BOUNDING_BOX, UNITS_PER_EM
 from src.functions import get_font_type
 
 
 def create_ot_font_tables(font, bold = False, italic = False):
-    print("→ 📄 Creating opentype table...")
+    """Creates CFF (OpenType) outline tables with font set, top dict, and charstring storage."""
     font.sfntVersion = "OTTO"
     cff = font["CFF "] = newTable("CFF ")
     cff_font_set = CFFFontSet()
@@ -19,7 +19,7 @@ def create_ot_font_tables(font, bold = False, italic = False):
     cff_font_set.topDictIndex = top_dict_index
     cff_font_set.major = 1
     cff_font_set.minor = 0
-    cff_font_set.fontNames = [FONT_NAME + get_font_type(bold, italic)]
+    cff_font_set.fontNames = [OUTPUT_FONT_NAME + get_font_type(bold, italic)]
     cff_font_set.GlobalSubrs = Index()
 
     #top_dict.FamilyName = f"{FONT_NAME} Font"

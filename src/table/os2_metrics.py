@@ -4,7 +4,7 @@ from fontTools.ttLib.tables.O_S_2f_2 import Panose
 from src.config import ASCENT, DESCENT
 
 def create_font_metrics_table(font):
-    print("→ 📄 Generating metrics table...")
+    """Creates the 'OS/2' table with weight class, embedding flags, and typographic metrics."""
     os2 = font["OS/2"] = newTable("OS/2")
     os2.achVendID = "PYFT" # 4-character identifier for the vendor (e.g., PYFT, NONE)
     os2.fsSelection = 0x0040 # Bit flags for styling (e.g., italic, bold)

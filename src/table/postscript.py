@@ -1,7 +1,7 @@
 from fontTools.ttLib import newTable
 
 def create_font_pscript_table(font, use_cff: bool = True):
-    print("→ 📄 Generating postscript table...")
+    """Creates the 'post' table with PostScript rendering hints and underline metrics."""
     post = font["post"] = newTable("post")
     post.formatType = 3.0
     post.isFixedPitch = 0

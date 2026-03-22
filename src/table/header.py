@@ -4,7 +4,7 @@ from fontTools.ttLib import newTable
 from src.config import UNITS_PER_EM, BOUNDING_BOX, DEFAULT_GLYPH_SIZE, MAC_EPOCH
 
 def create_font_header_table(font, use_cff: bool = True):
-    print("→ 📄 Generating header table...")
+    """Creates the 'head' table with font-wide metadata, timestamps, and bounding box."""
     now = int(time.time())
     head = font["head"] = newTable("head")
     head.checkSumAdjustment = 0 # Used to ensure the font has a valid file checksum (recalculated automatically)
@@ -18,6 +18,6 @@ def create_font_header_table(font, use_cff: bool = True):
     head.macStyle = 0 # Bit flags for font styling (e.g., bold, italic)
     head.magicNumber = 0x5F0F3CF5 # Verification signature for OpenType and TrueType
     head.modified = now + (MAC_EPOCH - int(time.mktime(time.gmtime(0)))) # Last modified timestamp of the font
-    head.tableVersion = 1
+    head.tableVersion = 1.0
     head.unitsPerEm = UNITS_PER_EM # Defines the em square size (Higher values increase the resolution of glyph coordinates)
     head.xMin, head.yMin, head.xMax, head.yMax = BOUNDING_BOX # Bounding Box of all glyphs

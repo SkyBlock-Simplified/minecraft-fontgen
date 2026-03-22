@@ -3,7 +3,7 @@ from fontTools.ttLib import newTable
 from src.config import ASCENT, DESCENT, MAX_ADVANCE_WIDTH, BOUNDING_BOX
 
 def create_font_hheader_table(font, use_cff: bool = True):
-    print("→ 📄 Generating horizontal header table...")
+    """Creates the 'hhea' table with horizontal layout metrics (ascent, descent, line gap)."""
     hhea = font["hhea"] = newTable("hhea")
     hhea.advanceWidthMax = MAX_ADVANCE_WIDTH # Maximum advance width among all glyphs
     #hhea.ascender = ASCENT
@@ -21,5 +21,5 @@ def create_font_hheader_table(font, use_cff: bool = True):
     hhea.reserved1 = 0
     hhea.reserved2 = 0
     hhea.reserved3 = 0
-    hhea.tableVersion = 1
+    hhea.tableVersion = 0x00010000
     hhea.xMaxExtent = BOUNDING_BOX[2] # Maximum horizontal extent (left sidebearing + glyph width)

@@ -4,14 +4,14 @@ from fontTools.ttLib import newTable
 from fontTools.ttLib.tables.ttProgram import Program
 
 def create_tt_font_tables(font):
-    print("→ 📄 Creating truetype table...")
+    """Creates TrueType outline tables (glyf, loca) with FontForge compatibility stubs."""
     font.sfntVersion = 0x00010000
     font["glyf"] = newTable("glyf")
     font["glyf"].glyphs = {}
 
     font["loca"] = newTable("loca") # Automatically populated
 
-    print(" → ➕ Adding fontforge compatibility...")
+    # FontForge Compatibility
     font["prep"] = newTable("prep") # TT instructions pre-program
     font["prep"].program = Program() # Dummy
 
