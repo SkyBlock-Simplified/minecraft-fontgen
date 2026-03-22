@@ -64,6 +64,7 @@ Configuration is module-level constants, not CLI args. Key settings:
 - `OPENTYPE = True` - CFF (OpenType) vs TrueType outlines
 - `UNIFONT = True` - Include GNU Unifont fallback glyphs
 - `CREATE_REGULAR/BOLD/ITALIC` - Which font styles to generate
+- `UNIFONT_DEBUG_SVG = False` - When `True`, dumps SVG debug output for unifont tiles (same as provider tiles)
 - `UNITS_PER_EM = 1024`, `DEFAULT_GLYPH_SIZE = 8` - Font metrics
 - `BOUNDING_BOX = [0, -128, 1152, 896]` - Global glyph bounds
 - `OUTPUT_FONT_NAME = "Minecraft"` - Output font family name
