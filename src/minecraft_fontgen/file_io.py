@@ -7,8 +7,8 @@ import numpy as np
 from collections import deque, OrderedDict
 from tqdm import tqdm
 from PIL import Image
-from minecraft_fontgen.config import COLUMNS_PER_ROW, DEFAULT_GLYPH_SIZE, OUTPUT_DIR, MINECRAFT_JAR_DIR, WORK_DIR, UNITS_PER_EM, UNIFONT_DEBUG_SVG
-from minecraft_fontgen.functions import get_unicode_codepoint, log, is_silent
+from minecraft_fontgen.config import COLUMNS_PER_ROW, DEFAULT_GLYPH_SIZE, OUTPUT_DIR, MINECRAFT_JAR_DIR, WORK_DIR, UNITS_PER_EM, UNIFONT_DEBUG_SVG, TEXTURE_PATH
+from minecraft_fontgen.functions import get_unicode_codepoint, in_unifont_ranges, log, is_silent, parse_json
 
 
 def _write_tile_svg(grid, size, output_file):
@@ -229,10 +229,11 @@ def crop_tile_from_bitmap(bitmap, tile):
     """Crops a single glyph tile from a full provider bitmap and saves it to disk."""
     x, y = tile["location"]
     width, height = tile["size"]
-    px, py = (x * DEFAULT_GLYPH_SIZE, y * height)
+    glyph_width = int(width)
+    px, py = (x * glyph_width, y * height)
 
     bitmap = {
-        "image": bitmap.crop((px, py, px + DEFAULT_GLYPH_SIZE, py + height)),
+        "image": bitmap.crop((px, py, px + glyph_width, py + height)),
         "file": f"{tile['output']}/glyph.bmp"
     }
 
@@ -312,24 +313,88 @@ def slice_providers_into_tiles(providers):
         provider["tiles"] = tiles
 
 def read_providers_from_bin(byte_data):
-    """Parses legacy binary glyph_sizes.bin format (stub, not fully implemented)."""
+    """Parses legacy binary glyph_sizes.bin format (Minecraft 1.8.9 and earlier).
+
+    Scans for ascii.png (8x8 glyphs) and unicode_page_XX.png (16x16 glyphs)
+    in the extracted font textures directory. Creates provider dicts compatible
+    with the JSON provider pipeline.
+    """
     glyph_widths = list(byte_data)
+    providers = []
 
-    # # Check length (should be 256 for 16x16 fonts)
-    # print(f"Loaded {len(glyph_widths)} glyph widths.")
-    # print(glyph_widths[:16])  # Print first row of glyph widths
-    log("→ 🛠️ Building bitmap providers...")
+    glyph_count = sum(1 for w in glyph_widths if w != 0)
+    log(f"→ 🛠️ Parsing bitmap providers ({glyph_count} non-empty in glyph_sizes.bin)...")
 
-    # should be able to convert ascii.png
-    # convert each unicode_page_XX.png into codepoint based on x,y
-    # then get Unicode character from codepoint
+    # 1. Discover unicode_page_XX.png files (16x16 glyphs, 256 chars per page)
+    #    Added first so ascii.png can override codepoints 0-255
+    for page in range(256):
+        page_hex = f"{page:02x}"
+        page_file = f"unicode_page_{page_hex}.png"
+        page_path = f"{TEXTURE_PATH}/{page_file}"
 
-    return None
+        if not os.path.isfile(page_path):
+            continue
+
+        base_cp = page * 256
+        chars = []
+        for i in range(256):
+            cp = base_cp + i
+            if cp < len(glyph_widths) and glyph_widths[cp] != 0 and in_unifont_ranges(cp):
+                chars.append(chr(cp))
+            else:
+                chars.append(chr(0))
+
+        valid_count = sum(1 for c in chars if c != chr(0))
+        if valid_count == 0:
+            continue
+
+        name = f"unicode_page_{page_hex}"
+        output = f"{WORK_DIR}/glyphs/{name}"
+        os.makedirs(output, exist_ok=True)
+
+        log(f" → 🔢 Detected {valid_count} unicode characters in '{name}'...")
+
+        providers.append({
+            "ascent": 15,
+            "height": 16,
+            "chars": chars,
+            "file_name": page_file,
+            "file_path": page_path,
+            "name": name,
+            "output": output,
+            "tiles": []
+        })
+
+    # 2. ascii.png (8x8 glyphs, codepoints 0-255)
+    #    Added last so it takes priority over unicode_page_00 for overlapping codepoints
+    ascii_file = "ascii.png"
+    ascii_path = f"{TEXTURE_PATH}/{ascii_file}"
+
+    if os.path.isfile(ascii_path):
+        chars = [chr(i) for i in range(256)]
+        name = "ascii"
+        output = f"{WORK_DIR}/glyphs/{name}"
+        os.makedirs(output, exist_ok=True)
+
+        log(f" → 🔢 Detected 256 unicode characters in '{name}'...")
+
+        providers.append({
+            "ascent": 7,
+            "height": 8,
+            "chars": chars,
+            "file_name": ascii_file,
+            "file_path": ascii_path,
+            "name": name,
+            "output": output,
+            "tiles": []
+        })
+
+    return providers
 
 def read_providers_from_json(byte_data):
     """Parses the JSON font provider format (default.json) into a list of provider dicts."""
     raw_text = byte_data.decode("utf-8", errors="surrogatepass")
-    data = json.loads(raw_text)
+    data = parse_json(raw_text)
 
     log("→ 🛠️ Parsing bitmap providers...")
     providers = []

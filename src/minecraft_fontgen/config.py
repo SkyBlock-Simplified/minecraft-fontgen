@@ -56,6 +56,7 @@ MINECRAFT_JAR_DIR = WORK_DIR + "/assets/minecraft"
 MINECRAFT_BIN_FILE = f"{MINECRAFT_JAR_DIR}/font/glyph_sizes.bin"
 MINECRAFT_JSON_FILE = f"{MINECRAFT_JAR_DIR}/font/include/default.json"
 UNIFONT_PATH = "minecraft/font/include/unifont.json"
+TEXTURE_PATH = f"{MINECRAFT_JAR_DIR}/textures/font"
 
 # FontTools Epoch
 MAC_EPOCH = 2082844800 # Seconds since 12:00 midnight, January 1, 1904 UTC
