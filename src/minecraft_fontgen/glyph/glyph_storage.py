@@ -1,7 +1,7 @@
 from collections import OrderedDict
 
 from minecraft_fontgen.glyph.glyph import Glyph
-from minecraft_fontgen.config import NOTDEF, DEFAULT_GLYPH_SIZE, UNITS_PER_EM, UNITS_PER_PIXEL
+from minecraft_fontgen.config import NOTDEF, DEFAULT_GLYPH_SIZE, UNITS_PER_EM
 
 class GlyphStorage:
     """Accumulates drawn glyphs, manages cmap entries, and writes final font data."""
@@ -25,8 +25,9 @@ class GlyphStorage:
     def add(self, glyph: Glyph):
         """Adds a drawn glyph to storage with its advance width, LSB, and cmap mappings."""
         name = glyph.name
-        advance_width = UNITS_PER_EM // 2 if name in ("space", "uni0020") else int(round(glyph.advance * UNITS_PER_PIXEL))
-        lsb = int(round(glyph.lsb * UNITS_PER_PIXEL))
+        units_per_pixel = UNITS_PER_EM / glyph.size[0]
+        advance_width = UNITS_PER_EM // 2 if name in ("space", "uni0020") else int(round(glyph.advance * units_per_pixel))
+        lsb = int(round(glyph.lsb * units_per_pixel))
         self.hmtx[name] = (advance_width, lsb)
 
         # Draw font glyph

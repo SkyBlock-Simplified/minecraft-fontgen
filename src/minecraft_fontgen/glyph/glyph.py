@@ -195,7 +195,7 @@ class Glyph:
     def _new_pen(self):
         """Creates a new fontTools drawing pen (T2CharStringPen for CFF, TTGlyphPen for TrueType)."""
         if self.use_cff:
-            units_per_pixel = UNITS_PER_EM / DEFAULT_GLYPH_SIZE
+            units_per_pixel = UNITS_PER_EM / self.size[0]
             advance_width = round(self.width * units_per_pixel)
             return T2CharStringPen(advance_width, None)
         else:
