@@ -4,11 +4,14 @@ from collections import defaultdict
 from fontTools.pens.t2CharStringPen import T2CharStringPen
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 
-from src.config import UNITS_PER_EM, DEFAULT_GLYPH_SIZE, NOTDEF, NOTDEF_GLYPH
+from src.config import UNITS_PER_EM, DEFAULT_GLYPH_SIZE, NOTDEF, NOTDEF_GLYPH, ITALIC_SHEAR_FACTOR
 from src.functions import get_unicode_codepoint
 
 class Glyph:
+    """Represents a single font glyph with pixel data, scaling, and pen drawing capabilities."""
+
     def __init__(self, tile, use_cff: bool = True):
+        """Initializes a glyph from tile data, creating a drawing pen and handling .notdef."""
         self.unicode = tile["unicode"]
         self.codepoint = self._get_codepoint() if "codepoint" not in tile else tile["codepoint"]
         self.use_cff = use_cff
@@ -24,8 +27,11 @@ class Glyph:
         self.lsb = self.pixels["lsb"] if "lsb" in self.pixels else 0
         self.outer = self.pixels["paths"] if "paths" in self.pixels else {}
         self.holes = self.pixels["holes"] if "holes" in self.pixels else {}
-        self.outer_scaled = {}
-        self.holes_scaled = {}
+
+        # Pre-computed scaled coordinates (set during glyph map building)
+        self.scaled = tile.get("scaled", None)
+        self.outer_scaled = []
+        self.holes_scaled = []
 
         # Create pen
         self.pen = self._new_pen()
@@ -75,6 +81,7 @@ class Glyph:
             draw_contour(list(reversed(hole_path)))
 
     def get(self):
+        """Returns the finalized font glyph object (T2CharString for CFF, TTGlyph for TrueType)."""
         if self.use_cff:
             glyph = self.pen.getCharString()
         else:
@@ -83,35 +90,32 @@ class Glyph:
         return glyph
 
     def cpt(self):
+        """Returns True if this glyph is one of a set of debug-tracked codepoints."""
         return self.codepoint in [0x0034, 0x0038, 0x0051, 0x0041, 0x00C0, 0x00CA]
 
-    def scale(self):
-        if not self.pixels:
+    def scale(self, italic=False):
+        """Assigns pre-computed scaled coordinates, applying italic shear if requested."""
+        if self.scaled is None:
             return
 
-        if not self.pixels or all(len(p.get("corners", [])) < 3 for p in self.outer.values()):
+        outer = self.scaled.get("outer", [])
+        holes = self.scaled.get("holes", [])
+
+        if not outer and not holes:
             return
 
-        outer_paths = [p["corners"] for p in self.outer.values() if len(p.get("corners", [])) >= 3]
-        hole_paths = [h["corners"] for h in self.holes.values() if len(h.get("corners", [])) >= 3]
-
-        all_points = [pt for path in outer_paths + hole_paths for pt in path]
-        min_x = min(x for x, y in all_points)
-        #max_y = max(y for x, y in all_points)
-
-        width, height = self.size
-        scale_x = UNITS_PER_EM / width
-        scale_y = UNITS_PER_EM / height
-        descender_offset = height - 1
-
-        def transform(pt):
-            x, y = pt
-            return (x - min_x) * scale_x, (descender_offset - y) * scale_y
-
-        self.outer_scaled = [[transform(pt) for pt in path] for path in outer_paths]
-        self.holes_scaled = [[transform(pt) for pt in path] for path in hole_paths]
+        if italic:
+            def apply_shear(pt):
+                sx, sy = pt
+                return (sx + sy * ITALIC_SHEAR_FACTOR, sy)
+            self.outer_scaled = [[apply_shear(pt) for pt in path] for path in outer]
+            self.holes_scaled = [[apply_shear(pt) for pt in path] for path in holes]
+        else:
+            self.outer_scaled = outer
+            self.holes_scaled = holes
 
     def valid(self):
+        """Returns True if this glyph has a valid, non-null, non-.notdef codepoint."""
         if self.codepoint is None:
             print(f" → ⚠️ Skipping invalid unicode '0x{self.codepoint:04X}'.")
             return False
@@ -175,9 +179,11 @@ class Glyph:
             f.write(svg_header + "\n" + "\n".join(svg_paths) + "\n" + svg_footer)
 
     def _get_codepoint(self):
+        """Resolves the integer codepoint from the unicode character string."""
         return get_unicode_codepoint(self.unicode)
 
     def _get_name(self):
+        """Returns the PostScript glyph name (uni0041 for BMP, u010000 for SMP)."""
         if self.codepoint == 0x0000:
             return NOTDEF
         elif self.codepoint <= 0xFFFF:
@@ -186,6 +192,7 @@ class Glyph:
             return f"u{self.codepoint:06X}"
 
     def _new_pen(self):
+        """Creates a new fontTools drawing pen (T2CharStringPen for CFF, TTGlyphPen for TrueType)."""
         if self.use_cff:
             units_per_pixel = UNITS_PER_EM / DEFAULT_GLYPH_SIZE
             advance_width = round(self.width * units_per_pixel)
