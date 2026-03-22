@@ -4,8 +4,10 @@ from src.glyph.glyph import Glyph
 from src.config import NOTDEF, DEFAULT_GLYPH_SIZE, UNITS_PER_EM, UNITS_PER_PIXEL
 
 class GlyphStorage:
+    """Accumulates drawn glyphs, manages cmap entries, and writes final font data."""
+
     def __init__(self, font, use_cff: bool = True):
-        print("→ 📄 Creating glyph storage...")
+        """Initializes storage bound to a TTFont, extracting CFF or glyf table references."""
         self.font = font
         self.tables = font["cmap"].tables
         self.use_cff = use_cff
@@ -21,6 +23,7 @@ class GlyphStorage:
             self.glyf = font["glyf"]
 
     def add(self, glyph: Glyph):
+        """Adds a drawn glyph to storage with its advance width, LSB, and cmap mappings."""
         name = glyph.name
         advance_width = UNITS_PER_EM // 2 if name in ("space", "uni0020") else int(round(glyph.advance * UNITS_PER_PIXEL))
         lsb = int(round(glyph.lsb * UNITS_PER_PIXEL))
@@ -46,6 +49,7 @@ class GlyphStorage:
                 table.cmap[glyph.codepoint] = name
 
     def add_notdef(self):
+        """Creates and adds the .notdef placeholder glyph."""
         self.add(Glyph({
             "unicode": None,
             "codepoint": 0x0000,
@@ -55,13 +59,15 @@ class GlyphStorage:
         }, self.use_cff))
 
     def new_glyph(self, tile):
+        """Creates a new Glyph instance from tile data using this storage's font format."""
         return Glyph(tile, self.use_cff)
 
     def save(self, output_file):
-        print(f"→ 💾 Saving font to '{output_file}'...")
+        """Saves the assembled font to an output file."""
         self.font.save(output_file)
 
     def write(self):
+        """Finalizes the font by setting glyph order, charstrings/glyf entries, and metrics."""
         # Sort glyphs
         self.glyphs = OrderedDict([(NOTDEF, self.glyphs[NOTDEF])] + list(self.glyphs.items()))
 
