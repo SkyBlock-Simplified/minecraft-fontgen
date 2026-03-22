@@ -6,8 +6,27 @@ from src.config import OUTPUT_DIR, OUTPUT_FONTS
 VALID_STYLES = {"regular", "bold", "italic", "bolditalic"}
 
 
+def _load_env_file(path=".env"):
+    """Loads key=value pairs from a .env file into os.environ (won't overwrite existing vars)."""
+    if not os.path.isfile(path):
+        return
+
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip().strip("\"'")
+            if key and key not in os.environ:
+                os.environ[key] = value
+
+
 def parse_args():
     """Parses CLI arguments with env var fallbacks. Returns (silent, output_dir, output_fonts)."""
+    _load_env_file()
+
     parser = argparse.ArgumentParser(description="Minecraft bitmap font to OpenType/TrueType converter.")
     parser.add_argument("--silent", action="store_true", default=None,
                         help="Suppress all output except errors")
