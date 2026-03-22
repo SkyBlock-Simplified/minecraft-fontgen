@@ -1,11 +1,11 @@
 from setuptools import setup, find_packages
 
-from src.config import AUTHOR, VERSION
+from src.config import DESIGNER, VERSION
 
 setup(
     name="minecraft-fontgen",
     version=VERSION,
-    author=AUTHOR,
+    author=DESIGNER,
     description="A tool to convert Minecraft-style bitmaps into OpenType/TrueType fonts.",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
@@ -23,5 +23,5 @@ setup(
         "License :: OSI Approved :: Apache 2.0 License",
         "Operating System :: OS Independent",
     ],
-    python_requires=">=3.7",
+    python_requires=">=3.14",
 )
