@@ -1,6 +1,22 @@
 import requests
 
-from src.config import MINECRAFT_RESOURCE_URL
+import src.config as config
+
+
+def set_silent(value):
+    """Sets the global silent mode flag."""
+    config.SILENT = value
+
+
+def is_silent():
+    """Returns True if silent mode is enabled."""
+    return config.SILENT
+
+
+def log(*args, **kwargs):
+    """Prints to stdout only when silent mode is disabled."""
+    if not config.SILENT:
+        print(*args, **kwargs)
 
 
 def get_unicode_codepoint(unicode_char: str):
@@ -21,14 +37,14 @@ def get_font_type(bold = False, italic = False):
 
 def fetch_bytes(url, label=None):
     """Downloads raw bytes from a URL and returns the response content."""
-    print(f"→ 🌐 Downloading {label or url}...")
+    log(f"→ 🌐 Downloading {label or url}...")
     request = requests.get(url, timeout=30)
     request.raise_for_status()
     return request.content
 
 def fetch_json(url, label=None):
     """Downloads and parses JSON from a URL."""
-    print(f"→ 🌐 Downloading {label or url}...")
+    log(f"→ 🌐 Downloading {label or url}...")
     request = requests.get(url, timeout=30)
     request.raise_for_status()
     return request.json()
@@ -36,8 +52,8 @@ def fetch_json(url, label=None):
 def fetch_minecraft_resource(sha1, label=None):
     """Fetches a JSON resource from the Mojang CDN by its SHA-1 hash.
     (resources.download.minecraft.net/<first2>/<sha1>)"""
-    return fetch_json(f"{MINECRAFT_RESOURCE_URL}/{sha1[:2]}/{sha1}", label=label)
+    return fetch_json(f"{config.MINECRAFT_RESOURCE_URL}/{sha1[:2]}/{sha1}", label=label)
 
 def fetch_minecraft_resource_bytes(sha1, label=None):
     """Fetches raw bytes from the Mojang CDN by its SHA-1 hash."""
-    return fetch_bytes(f"{MINECRAFT_RESOURCE_URL}/{sha1[:2]}/{sha1}", label=label)
+    return fetch_bytes(f"{config.MINECRAFT_RESOURCE_URL}/{sha1[:2]}/{sha1}", label=label)

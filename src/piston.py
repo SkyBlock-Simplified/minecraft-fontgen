@@ -6,7 +6,7 @@ import zipfile
 from io import BytesIO
 
 from src.config import MINECRAFT_MANIFEST_URL, MINECRAFT_BIN_FILE, MINECRAFT_JSON_FILE, WORK_DIR, UNIFONT_PATH, UNIFONT, UNIFONT_RANGES
-from src.functions import fetch_bytes, fetch_json, fetch_minecraft_resource, fetch_minecraft_resource_bytes
+from src.functions import fetch_bytes, fetch_json, fetch_minecraft_resource, fetch_minecraft_resource_bytes, log
 
 def in_unifont_ranges(codepoint):
     """Returns True if the codepoint falls within any configured UNIFONT_RANGES."""
@@ -18,7 +18,7 @@ def in_unifont_ranges(codepoint):
 
 def extract_font_assets(jar_data, output_path):
     """Extracts font-related files (default.json, font textures) from the Minecraft JAR."""
-    print("→ 📦 Extracting font assets...")
+    log("→ 📦 Extracting font assets...")
     os.makedirs(output_path, exist_ok=True)
     extracted = []
 
@@ -32,7 +32,7 @@ def extract_font_assets(jar_data, output_path):
 
 def save_jar_to_disk(jar_data, output_path):
     """Writes the downloaded JAR BytesIO to disk as minecraft.jar."""
-    print(f"→ 📦 Extracting client.jar...")
+    log(f"→ 📦 Extracting client.jar...")
     with open(f"{output_path}/minecraft.jar", "wb") as f:
         f.write(jar_data.getbuffer())
 
@@ -92,7 +92,7 @@ def read_unifont_glyphs(unifont_objects):
 
     for path, sha1 in unifont_objects.items():
         zip_bytes = fetch_minecraft_resource_bytes(sha1, label=path)
-        print(f"→ 📦 Extracting {path}...")
+        log(f"→ 📦 Extracting {path}...")
 
         with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zip_file:
             for name in zip_file.namelist():
@@ -106,7 +106,7 @@ def read_unifont_glyphs(unifont_objects):
 
 def find_unifont_objects(asset_index):
     """Locates unifont ZIP file hashes and size overrides in the Minecraft asset index."""
-    print(f"🧩 Processing unifont objects...")
+    log(f"🧩 Processing unifont objects...")
     found = {}
     size_overrides = []
     objects = asset_index.get("objects", {})
@@ -129,7 +129,7 @@ def find_unifont_objects(asset_index):
             obj = objects.get(key)
 
             if obj and "hash" in obj:
-                print(f" → 🔣 Detected {key}...")
+                log(f" → 🔣 Detected {key}...")
                 found[key] = obj["hash"]
 
         # Extract size_overrides for future use
@@ -175,25 +175,25 @@ def select_minecraft_version():
 
             for i, (_version, _) in enumerate(_versions.items(), 1):
                 tabs = '\t' * (1 if len(_version) > 3 else 2)
-                print(_version, end=tabs)
+                log(_version, end=tabs)
 
                 if i % 15 == 0:
-                    print()  # Newline after every 15 items
+                    log()  # Newline after every 15 items
 
             # Final newline if needed
             if len(_versions) % 15 != 0:
-                print()
+                log()
 
         if version in ["exit", "leave", "quit", "stop"]:
-            print("Exiting...")
+            log("Exiting...")
             break
 
         if version in ["h", "?", "help"]:
-            print("Available commands:")
-            print(" - 'exit' or 'quit' to quit")
-            print(" - 'h', '?' or 'help' to show this help message")
-            print(" - 'r' or 'releases' to list all available releases")
-            print(" - 's' or 'snapshots' to list all available releases")
+            log("Available commands:")
+            log(" - 'exit' or 'quit' to quit")
+            log(" - 'h', '?' or 'help' to show this help message")
+            log(" - 'r' or 'releases' to list all available releases")
+            log(" - 's' or 'snapshots' to list all available releases")
             continue
 
         if version in ["r", "releases", "release"]:
@@ -211,13 +211,13 @@ def select_minecraft_version():
                 break
 
         if not selected_version:
-            print("Invalid version. Please try again.")
+            log("Invalid version. Please try again.")
 
     return selected_data
 
 def read_minecraft_piston_api():
     """Downloads and extracts Minecraft font assets and unifont fallbacks via the Piston API."""
-    print(f"🧩 Processing minecraft piston data...")
+    log(f"🧩 Processing minecraft piston data...")
     version_json = select_minecraft_version()
     version_data = fetch_json(version_json["url"], label="version metadata")
 
@@ -240,11 +240,11 @@ def read_minecraft_piston_api():
             matched_format = "json"
 
         if matched_file:
-            print(f"→ 🔢 Detected {matched_format} format...")
+            log(f"→ 🔢 Detected {matched_format} format...")
             break
 
     if not matched_file:
-        print("→ ❌ Could not detect font assets format.")
+        log("→ ❌ Could not detect font assets format.")
 
     # Download unifont fallback glyphs
     unifont_glyphs = None

@@ -1,4 +1,5 @@
 import os
+import sys
 
 from collections import defaultdict
 from fontTools.pens.t2CharStringPen import T2CharStringPen
@@ -117,7 +118,7 @@ class Glyph:
     def valid(self):
         """Returns True if this glyph has a valid, non-null, non-.notdef codepoint."""
         if self.codepoint is None:
-            print(f" → ⚠️ Skipping invalid unicode '0x{self.codepoint:04X}'.")
+            print(f" → ⚠️ Skipping invalid unicode '0x{self.codepoint:04X}'.", file=sys.stderr)
             return False
         elif self.codepoint == 0x0000:
             return False

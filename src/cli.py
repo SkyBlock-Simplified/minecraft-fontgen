@@ -1,0 +1,57 @@
+import argparse
+import os
+
+from src.config import OUTPUT_DIR, OUTPUT_FONTS
+
+VALID_STYLES = {"regular", "bold", "italic", "bolditalic"}
+
+
+def parse_args():
+    """Parses CLI arguments with env var fallbacks. Returns (silent, output_dir, output_fonts)."""
+    parser = argparse.ArgumentParser(description="Minecraft bitmap font to OpenType/TrueType converter.")
+    parser.add_argument("--silent", action="store_true", default=None,
+                        help="Suppress all output except errors")
+    parser.add_argument("--output", type=str, default=None,
+                        help="Override output directory")
+    parser.add_argument("--styles", type=str, default=None,
+                        help="Comma-separated font styles: regular,bold,italic,bolditalic")
+
+    args = parser.parse_args()
+
+    # --- silent ---
+    if args.silent is not None and args.silent:
+        silent = True
+    elif os.environ.get("FONTGEN_SILENT", "").lower() in ("1", "true", "yes"):
+        silent = True
+    else:
+        silent = False
+
+    # --- output_dir ---
+    if args.output is not None:
+        output_dir = args.output
+    elif os.environ.get("FONTGEN_OUTPUT"):
+        output_dir = os.environ["FONTGEN_OUTPUT"]
+    else:
+        output_dir = OUTPUT_DIR
+
+    # --- styles ---
+    raw_styles = None
+    if args.styles is not None:
+        raw_styles = args.styles
+    elif os.environ.get("FONTGEN_STYLES"):
+        raw_styles = os.environ["FONTGEN_STYLES"]
+
+    if raw_styles is not None:
+        requested = {s.strip().lower() for s in raw_styles.split(",")}
+        invalid = requested - VALID_STYLES
+        if invalid:
+            parser.error(f"Invalid style(s): {', '.join(sorted(invalid))}. "
+                         f"Valid options: {', '.join(sorted(VALID_STYLES))}")
+        output_fonts = [
+            (name, name.lower() in requested, bold, italic)
+            for name, _, bold, italic in OUTPUT_FONTS
+        ]
+    else:
+        output_fonts = OUTPUT_FONTS
+
+    return silent, output_dir, output_fonts
