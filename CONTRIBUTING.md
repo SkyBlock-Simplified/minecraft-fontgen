@@ -6,7 +6,6 @@ project follows.
 
 ## Table of Contents
 
-- [Code of Conduct](#code-of-conduct)
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
   - [Development Setup](#development-setup)
@@ -21,9 +20,8 @@ project follows.
 
 ## Code of Conduct
 
-Be respectful, constructive, and patient. Harassment, personal attacks, and
-bad-faith behavior will not be tolerated. We're all here to build something
-useful.
+This project follows the [Contributor Covenant 3.0 Code of Conduct](.github/CODE_OF_CONDUCT.md).
+Please read it before participating.
 
 ## Getting Started
 
