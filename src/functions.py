@@ -5,17 +5,17 @@ import src.config as config
 
 def set_silent(value):
     """Sets the global silent mode flag."""
-    config.SILENT = value
+    config.SILENT_LOG = value
 
 
 def is_silent():
     """Returns True if silent mode is enabled."""
-    return config.SILENT
+    return config.SILENT_LOG
 
 
 def log(*args, **kwargs):
     """Prints to stdout only when silent mode is disabled."""
-    if not config.SILENT:
+    if not config.SILENT_LOG:
         print(*args, **kwargs)
 
 

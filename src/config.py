@@ -1,10 +1,28 @@
 from math import atan
 
 # ======================
-# === FONT CONSTANTS ===
+# === OUTPUT RUNTIME ===
 # ======================
 
-# Font Naming
+SILENT_LOG = False
+OUTPUT_DIR = "output"
+
+# Output Structures
+OPENTYPE = True # False for TrueType
+UNIFONT = True # False to Disable
+CREATE_BMP = True # BMP (Format 4) (U+0000 - U+FFFF)
+CREATE_SMP = True # SMP (Format 12) (U+10000 - U+1FFFF)
+
+# Output Styles
+CREATE_REGULAR = True
+CREATE_BOLD = True
+CREATE_ITALIC = True
+UNIFONT_DEBUG_SVG = False
+
+# ====================
+# === NAME DETAILS ===
+# ====================
+
 MANUFACTURER = "SkyBlock Simplified"
 DESIGNER = "CraftedFury"
 COPYRIGHT = "Copyright © Mojang AB"
@@ -15,18 +33,6 @@ LICENSE_TEXT = "The glyphs used in this font file are licensed by Mojang."
 DESCRIPTION = "Build your own font files containing the Minecraft font glyphs."
 SAMPLE_TEXT = "The quick brown fox jumps over the lazy dog. 0123456789"
 
-# Font Structure
-OPENTYPE = True # False for TrueType
-UNIFONT = True # False to Disable
-CREATE_BMP = True # BMP (Format 4) (U+0000 - U+FFFF)
-CREATE_SMP = True # SMP (Format 12) (U+10000 - U+1FFFF)
-
-# Font Style
-CREATE_REGULAR = True
-CREATE_BOLD = True
-CREATE_ITALIC = True
-UNIFONT_DEBUG_SVG = False
-
 # ===============================
 # === CONSTANTS / DO NOT EDIT ===
 # ===============================
@@ -35,7 +41,6 @@ VERSION = "1.1.0"
 
 # File Output
 OUTPUT_FONT_NAME = "Minecraft"
-OUTPUT_DIR = "output"
 OUTPUT_FONTS = [
     ("Regular", CREATE_REGULAR, False, False),
     ("Bold", CREATE_BOLD, True, False),
