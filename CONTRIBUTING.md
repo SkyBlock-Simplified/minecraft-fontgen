@@ -32,8 +32,11 @@ project follows.
 
 1. **Fork and clone the repository**
 
+   [Fork the repository](https://github.com/SkyBlock-Simplified/minecraft-fontgen/fork),
+   then clone your fork:
+
    ```bash
-   git clone https://github.com/SkyBlock-Simplified/minecraft-fontgen.git
+   git clone https://github.com/<your-username>/minecraft-fontgen.git
    cd minecraft-fontgen
    ```
 
