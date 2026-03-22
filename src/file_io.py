@@ -7,34 +7,21 @@ import numpy as np
 from collections import deque, OrderedDict
 from tqdm import tqdm
 from PIL import Image
-from src.config import COLUMNS_PER_ROW, DEFAULT_GLYPH_SIZE, OUTPUT_DIR, MINECRAFT_JAR_DIR, WORK_DIR, UNIFONT_DEBUG_SVG, UNITS_PER_EM
-from src.functions import get_unicode_codepoint, get_font_type
+from src.config import COLUMNS_PER_ROW, DEFAULT_GLYPH_SIZE, OUTPUT_DIR, MINECRAFT_JAR_DIR, WORK_DIR, UNITS_PER_EM, UNIFONT_DEBUG_SVG
+from src.functions import get_unicode_codepoint, log, is_silent
 
 
-def convert_tile_into_svg(tile):
-    """Generates SVG debug output for both regular and bold styles of a tile."""
-    return {
-        "regular": _convert_tile_into_svg(tile, False),
-        "bold": _convert_tile_into_svg(tile, True)
-    }
+def _write_tile_svg(grid, size, output_file):
+    """Renders a pixel grid as an SVG file with 1x1 rect elements."""
+    width, height = size
 
-def _convert_tile_into_svg(tile, bold: bool = False, italic: bool = False):
-    """Renders a single tile's pixel grid as an SVG file with 1x1 rect elements."""
-    width, height = tile["size"]
-    gtype = get_font_type(bold, italic)
-
-    # Write <rect> elements left-aligned
     svg_rects = [
         f'<rect x="{x}" y="{y}" width="1" height="1" />'
-        for y, row in enumerate(tile["pixels"][gtype.lower()]["grid"])
+        for y, row in enumerate(grid)
         for x, val in enumerate(row)
         if val >= 1
     ]
 
-    # TODO: BOLD AND ITALIC
-    #transform = f"matrix(1,0,{ITALIC_SHEAR_FACTOR},1,0,0)"
-
-    # Save file
     svg = {
         "xml": f'''<?xml version="1.0" standalone="no"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 {width} {height}" shape-rendering="crispEdges">
@@ -43,13 +30,20 @@ def _convert_tile_into_svg(tile, bold: bool = False, italic: bool = False):
     </g>
 </svg>
 ''',
-        "file": f"{tile['output']}/{gtype.lower()}.svg"
+        "file": output_file
     }
 
     with open(svg["file"], "w", encoding="utf-8") as f:
         f.write(svg["xml"])
 
     return svg
+
+def convert_tile_into_svg(tile):
+    """Generates SVG debug output for both regular and bold styles of a tile."""
+    return {
+        "regular": _write_tile_svg(tile["pixels"]["regular"]["grid"], tile["size"], f"{tile['output']}/regular.svg"),
+        "bold": _write_tile_svg(tile["pixels"]["bold"]["grid"], tile["size"], f"{tile['output']}/bold.svg")
+    }
 
 def convert_tile_into_pixels(tile):
     """Converts a tile's bitmap image to pixel data for both regular and bold styles."""
@@ -270,10 +264,10 @@ def read_provider_bitmap(provider):
 
 def slice_providers_into_tiles(providers):
     """Slices each provider's bitmap PNG into individual glyph tiles with pixel and SVG data."""
-    print(f"→ ✂️ Slicing bitmap providers into tiles...")
+    log(f"→ ✂️ Slicing bitmap providers into tiles...")
 
     for provider in providers:
-        print(f" → 🖼️ Reading {provider['file_name']}...")
+        log(f" → 🖼️ Reading {provider['file_name']}...")
         bitmap = read_provider_bitmap(provider)
         tiles = []
 
@@ -283,7 +277,7 @@ def slice_providers_into_tiles(providers):
 
         with tqdm(enumerate(provider["chars"]), total=len(provider["chars"]),
                   desc=" → 🔣 Tiles", unit="tile",
-                  ncols=80, leave=False, file=sys.stdout) as tiles_progress:
+                  ncols=80, leave=False, file=sys.stdout, disable=is_silent()) as tiles_progress:
             for i, unicode in tiles_progress:
                 # Skip .notdef
                 codepoint = get_unicode_codepoint(unicode)
@@ -324,7 +318,7 @@ def read_providers_from_bin(byte_data):
     # # Check length (should be 256 for 16x16 fonts)
     # print(f"Loaded {len(glyph_widths)} glyph widths.")
     # print(glyph_widths[:16])  # Print first row of glyph widths
-    print("→ 🛠️ Building bitmap providers...")
+    log("→ 🛠️ Building bitmap providers...")
 
     # should be able to convert ascii.png
     # convert each unicode_page_XX.png into codepoint based on x,y
@@ -337,7 +331,7 @@ def read_providers_from_json(byte_data):
     raw_text = byte_data.decode("utf-8", errors="surrogatepass")
     data = json.loads(raw_text)
 
-    print("→ 🛠️ Parsing bitmap providers...")
+    log("→ 🛠️ Parsing bitmap providers...")
     providers = []
     for provider in data.get("providers", []):
         if provider.get("type") == "bitmap" and "chars" in provider:
@@ -350,7 +344,7 @@ def read_providers_from_json(byte_data):
 
             # Read unicode characters
             chars = [char for row in provider.get("chars", []) for char in row]
-            print(f" → 🔢 Detected {len(chars)} unicode characters in '{name}'...")
+            log(f" → 🔢 Detected {len(chars)} unicode characters in '{name}'...")
 
             providers.append({
                 "ascent": provider.get("ascent", 0),
@@ -367,11 +361,11 @@ def read_providers_from_json(byte_data):
 
 def read_providers_from_file(file, format):
     """Reads a font provider file, parses it by format, and slices into glyph tiles."""
-    print(f"🧩 Parsing {file}...")
+    log(f"🧩 Parsing {file}...")
     with open(file, "rb") as f:
         raw_bytes = f.read()
 
-    print(f"→ 🛠️ Decoding {format}...")
+    log(f"→ 🛠️ Decoding {format}...")
     if format == "bin":
         providers = read_providers_from_bin(raw_bytes)
     elif format == "json":
@@ -389,18 +383,25 @@ def convert_unifont_to_tiles(unifont_glyphs, bold=False):
 
     with tqdm(unifont_glyphs.items(), total=len(unifont_glyphs),
               desc=f" → 🔣 {style_label}", unit="glyph",
-              ncols=80, leave=False, file=sys.stdout) as progress:
+              ncols=80, leave=False, file=sys.stdout, disable=is_silent()) as progress:
         for codepoint, bitmap_rows in progress:
             bitmap_grid = np.array(bitmap_rows, dtype=np.uint8)
             pixel_data = _bitmap_to_pixel_data(bitmap_grid, bold)
             width = len(bitmap_rows[0]) if bitmap_rows else 8
+
+            svg = None
+            if UNIFONT_DEBUG_SVG:
+                output = f"{WORK_DIR}/glyphs/unifont/{style_label.lower()}/{codepoint:04X}"
+                os.makedirs(output, exist_ok=True)
+                svg = _write_tile_svg(pixel_data["grid"], (width, 16), f"{output}/{style_label.lower()}.svg")
+
             tiles[codepoint] = {
                 "unicode": chr(codepoint),
                 "codepoint": codepoint,
                 "size": (width, 16),
                 "ascent": 15,
                 "pixels": pixel_data,
-                "svg": None,
+                "svg": svg,
                 "source": "unifont"
             }
 
@@ -411,10 +412,10 @@ def precompute_glyph_scaling(glyph_map):
     styles = len(glyph_map)
     per_style = len(next(iter(glyph_map.values())))
     total = per_style * styles
-    print(f"→ ✖️ Pre-scaling {per_style} glyphs ({styles} styles)...")
+    log(f"→ ✖️ Pre-scaling {per_style} glyphs ({styles} styles)...")
 
     with tqdm(total=total, desc=" → 🔣 Scaling", unit="glyph",
-              ncols=80, leave=False, file=sys.stdout) as progress:
+              ncols=80, leave=False, file=sys.stdout, disable=is_silent()) as progress:
         for style_key in glyph_map:
             for cp, tile in glyph_map[style_key].items():
                 progress.update(1)
@@ -451,7 +452,7 @@ def precompute_glyph_scaling(glyph_map):
 
 def build_glyph_map(providers, unifont_glyphs):
     """Builds a unified glyph map merging provider glyphs (priority) with unifont fallbacks."""
-    print(f"🧩 Building unified glyph map...")
+    log(f"🧩 Building unified glyph map...")
     glyph_map = {"Regular": OrderedDict(), "Bold": OrderedDict()}
 
     # 1. Add provider glyphs (priority - added first)
@@ -472,11 +473,11 @@ def build_glyph_map(providers, unifont_glyphs):
                 glyph_map[style_key][cp] = flat_tile
 
     provider_count = len(glyph_map["Regular"])
-    print(f"→ 🔣 {provider_count} provider glyphs (priority)")
+    log(f"→ 🔣 {provider_count} provider glyphs (priority)")
 
     # 2. Add unifont glyphs (fallback - skip if codepoint exists)
     if unifont_glyphs:
-        print(f"→ 🔣 Processing unifont fallback glyphs...")
+        log(f"→ 🔣 Processing unifont fallback glyphs...")
         for style_key, bold in [("Regular", False), ("Bold", True)]:
             unifont_tiles = convert_unifont_to_tiles(unifont_glyphs, bold)
             for cp, tile in unifont_tiles.items():
@@ -490,19 +491,22 @@ def build_glyph_map(providers, unifont_glyphs):
     # 4. Print summary
     unifont_count = sum(1 for t in glyph_map["Regular"].values() if t["source"] == "unifont")
     total = len(glyph_map["Regular"])
-    print(f"→ 🔢 Prepared {total} glyphs ({provider_count} provider, {unifont_count} unifont)")
+    log(f"→ 🔢 Prepared {total} glyphs ({provider_count} provider, {unifont_count} unifont)")
 
     # 5. Pre-compute scaling
     precompute_glyph_scaling(glyph_map)
 
     return glyph_map
 
-def clean_directories():
+def clean_directories(output_dir=None):
     """Removes and recreates the work/ and output/ directories."""
-    print("🧹 Cleaning work directory...")
+    if output_dir is None:
+        output_dir = OUTPUT_DIR
+
+    log("🧹 Cleaning work directory...")
     shutil.rmtree(WORK_DIR, ignore_errors=True)
     os.makedirs(WORK_DIR, exist_ok=True)
 
-    print("🧹 Cleaning output directory...")
-    shutil.rmtree(OUTPUT_DIR, ignore_errors=True)
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    log("🧹 Cleaning output directory...")
+    shutil.rmtree(output_dir, ignore_errors=True)
+    os.makedirs(output_dir, exist_ok=True)
