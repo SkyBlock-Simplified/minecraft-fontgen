@@ -124,7 +124,7 @@ celerybeat.pid
 
 # Environments
 .env
-.venv
+.venv/
 env/
 venv/
 ENV/
@@ -155,11 +155,12 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
-# Input and output directory
-font/
-input/
+# Runtime directories
 output/
 work/
+
+# Reference font data
+src/font/
 
 # PyCharm
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can

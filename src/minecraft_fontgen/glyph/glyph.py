@@ -5,8 +5,8 @@ from collections import defaultdict
 from fontTools.pens.t2CharStringPen import T2CharStringPen
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 
-from src.config import UNITS_PER_EM, DEFAULT_GLYPH_SIZE, NOTDEF, NOTDEF_GLYPH, ITALIC_SHEAR_FACTOR
-from src.functions import get_unicode_codepoint
+from minecraft_fontgen.config import UNITS_PER_EM, DEFAULT_GLYPH_SIZE, NOTDEF, NOTDEF_GLYPH, ITALIC_SHEAR_FACTOR
+from minecraft_fontgen.functions import get_unicode_codepoint
 
 class Glyph:
     """Represents a single font glyph with pixel data, scaling, and pen drawing capabilities."""

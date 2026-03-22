@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=69.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "minecraft-fontgen"
+dynamic = ["version"]
+description = "A tool to convert Minecraft-style bitmaps into OpenType/TrueType fonts."
+requires-python = ">=3.14"
+license = "Apache-2.0"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.14",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "fonttools>=4.52",
+    "numpy>=2.1",
+    "pillow>=10.3",
+    "svgpathtools>=1.6",
+    "uharfbuzz>=0.40",
+    "tqdm>=4.67",
+    "requests>=2.31",
+]
+
+[project.scripts]
+minecraft-fontgen = "minecraft_fontgen.main:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "minecraft_fontgen.config.VERSION" }
+
+[tool.setuptools.packages.find]
+where = ["src"]

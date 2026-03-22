@@ -1,7 +1,7 @@
 import time
 
 from fontTools.ttLib import newTable
-from src.config import UNITS_PER_EM, BOUNDING_BOX, DEFAULT_GLYPH_SIZE, MAC_EPOCH
+from minecraft_fontgen.config import UNITS_PER_EM, BOUNDING_BOX, DEFAULT_GLYPH_SIZE, MAC_EPOCH
 
 def create_font_header_table(font, use_cff: bool = True):
     """Creates the 'head' table with font-wide metadata, timestamps, and bounding box."""

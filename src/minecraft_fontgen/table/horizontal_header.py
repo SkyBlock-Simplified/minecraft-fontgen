@@ -1,6 +1,6 @@
 from fontTools.ttLib import newTable
 
-from src.config import ASCENT, DESCENT, MAX_ADVANCE_WIDTH, BOUNDING_BOX
+from minecraft_fontgen.config import ASCENT, DESCENT, MAX_ADVANCE_WIDTH, BOUNDING_BOX
 
 def create_font_hheader_table(font, use_cff: bool = True):
     """Creates the 'hhea' table with horizontal layout metrics (ascent, descent, line gap)."""

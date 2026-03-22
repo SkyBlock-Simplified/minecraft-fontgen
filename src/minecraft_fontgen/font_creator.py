@@ -3,19 +3,19 @@ import sys
 from fontTools.ttLib import TTFont
 from tqdm import tqdm
 
-from src.functions import log, is_silent
+from minecraft_fontgen.functions import log, is_silent
 
-from src.glyph.glyph_storage import GlyphStorage
-from src.table.glyph_mappings import create_font_mapping_table
-from src.table.header import create_font_header_table
-from src.table.horizontal_header import create_font_hheader_table
-from src.table.horizontal_metrics import create_font_hmetrics_table
-from src.table.maximum_profile import create_font_mprofile_table
-from src.table.name import create_font_name_table
-from src.table.opentype import create_ot_font_tables
-from src.table.os2_metrics import create_font_metrics_table
-from src.table.postscript import create_font_pscript_table
-from src.table.truetype import create_tt_font_tables
+from minecraft_fontgen.glyph.glyph_storage import GlyphStorage
+from minecraft_fontgen.table.glyph_mappings import create_font_mapping_table
+from minecraft_fontgen.table.header import create_font_header_table
+from minecraft_fontgen.table.horizontal_header import create_font_hheader_table
+from minecraft_fontgen.table.horizontal_metrics import create_font_hmetrics_table
+from minecraft_fontgen.table.maximum_profile import create_font_mprofile_table
+from minecraft_fontgen.table.name import create_font_name_table
+from minecraft_fontgen.table.opentype import create_ot_font_tables
+from minecraft_fontgen.table.os2_metrics import create_font_metrics_table
+from minecraft_fontgen.table.postscript import create_font_pscript_table
+from minecraft_fontgen.table.truetype import create_tt_font_tables
 
 def create_font_files(glyph_map, use_cff, output_fonts, output_dir, output_font_name, output_file_ext):
     """Creates all enabled font files in batch: initializes tables, converts glyphs, saves."""

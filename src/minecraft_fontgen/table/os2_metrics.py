@@ -1,7 +1,7 @@
 from fontTools.ttLib import newTable
 from fontTools.ttLib.tables.O_S_2f_2 import Panose
 
-from src.config import ASCENT, DESCENT
+from minecraft_fontgen.config import ASCENT, DESCENT
 
 def create_font_metrics_table(font):
     """Creates the 'OS/2' table with weight class, embedding flags, and typographic metrics."""

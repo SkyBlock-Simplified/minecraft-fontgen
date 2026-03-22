@@ -1,12 +1,12 @@
 import sys
 import io
 
-from src.cli import parse_args
-from src.piston import read_minecraft_piston_api
-from src.file_io import clean_directories, read_providers_from_file, build_glyph_map
-from src.font_creator import create_font_files
-from src.config import OPENTYPE, OUTPUT_FONT_EXT, OUTPUT_FONT_NAME
-from src.functions import set_silent, log
+from minecraft_fontgen.cli import parse_args
+from minecraft_fontgen.piston import read_minecraft_piston_api
+from minecraft_fontgen.file_io import clean_directories, read_providers_from_file, build_glyph_map
+from minecraft_fontgen.font_creator import create_font_files
+from minecraft_fontgen.config import OPENTYPE, OUTPUT_FONT_EXT, OUTPUT_FONT_NAME
+from minecraft_fontgen.functions import set_silent, log
 
 # Force UTF-8 output to handle emoji in print statements
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")

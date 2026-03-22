@@ -1,6 +1,6 @@
 import requests
 
-import src.config as config
+import minecraft_fontgen.config as config
 
 
 def set_silent(value):

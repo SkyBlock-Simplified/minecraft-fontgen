@@ -7,7 +7,7 @@ def inspect_font_file(output_path):
     result = subprocess.run(
         [
             "fontforge", "-lang=py", "-script",
-            os.path.abspath("inspect/validate.py"),
+            os.path.abspath("scripts/validate_font.py"),
             output_path
         ],
         encoding="utf-8", # Avoids UnicodeDecodeError

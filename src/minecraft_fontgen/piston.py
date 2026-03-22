@@ -5,8 +5,8 @@ import zipfile
 
 from io import BytesIO
 
-from src.config import MINECRAFT_MANIFEST_URL, MINECRAFT_BIN_FILE, MINECRAFT_JSON_FILE, WORK_DIR, UNIFONT_PATH, UNIFONT, UNIFONT_RANGES
-from src.functions import fetch_bytes, fetch_json, fetch_minecraft_resource, fetch_minecraft_resource_bytes, log
+from minecraft_fontgen.config import MINECRAFT_MANIFEST_URL, MINECRAFT_BIN_FILE, MINECRAFT_JSON_FILE, WORK_DIR, UNIFONT_PATH, UNIFONT, UNIFONT_RANGES
+from minecraft_fontgen.functions import fetch_bytes, fetch_json, fetch_minecraft_resource, fetch_minecraft_resource_bytes, log
 
 def in_unifont_ranges(codepoint):
     """Returns True if the codepoint falls within any configured UNIFONT_RANGES."""

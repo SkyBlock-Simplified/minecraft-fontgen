@@ -1,7 +1,7 @@
 from collections import OrderedDict
 
-from src.glyph.glyph import Glyph
-from src.config import NOTDEF, DEFAULT_GLYPH_SIZE, UNITS_PER_EM, UNITS_PER_PIXEL
+from minecraft_fontgen.glyph.glyph import Glyph
+from minecraft_fontgen.config import NOTDEF, DEFAULT_GLYPH_SIZE, UNITS_PER_EM, UNITS_PER_PIXEL
 
 class GlyphStorage:
     """Accumulates drawn glyphs, manages cmap entries, and writes final font data."""

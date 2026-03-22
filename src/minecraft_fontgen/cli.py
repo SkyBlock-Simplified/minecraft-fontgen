@@ -1,7 +1,7 @@
 import argparse
 import os
 
-from src.config import OUTPUT_DIR, OUTPUT_FONTS
+from minecraft_fontgen.config import OUTPUT_DIR, OUTPUT_FONTS
 
 VALID_STYLES = {"regular", "bold", "italic", "bolditalic"}
 

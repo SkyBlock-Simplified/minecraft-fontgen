@@ -4,8 +4,8 @@ from fontTools.cffLib import (
     PrivateDict, FontDict, FDSelect, CharStrings
 )
 
-from src.config import OUTPUT_FONT_NAME, BOUNDING_BOX, UNITS_PER_EM
-from src.functions import get_font_type
+from minecraft_fontgen.config import OUTPUT_FONT_NAME, BOUNDING_BOX, UNITS_PER_EM
+from minecraft_fontgen.functions import get_font_type
 
 
 def create_ot_font_tables(font, bold = False, italic = False):

@@ -1,8 +1,8 @@
 from math import atan
 
-# ======================
-# === OUTPUT RUNTIME ===
-# ======================
+# =============================
+# === RUNTIME CONFIGURATION ===
+# =============================
 
 SILENT_LOG = False
 OUTPUT_DIR = "output"
@@ -19,10 +19,11 @@ CREATE_BOLD = True
 CREATE_ITALIC = True
 UNIFONT_DEBUG_SVG = False
 
-# ====================
-# === NAME DETAILS ===
-# ====================
+# ==================================
+# === FONT DETAILS / DO NOT EDIT ===
+# ==================================
 
+VERSION = "1.1.0"
 MANUFACTURER = "SkyBlock Simplified"
 DESIGNER = "CraftedFury"
 COPYRIGHT = "Copyright © Mojang AB"
@@ -36,8 +37,6 @@ SAMPLE_TEXT = "The quick brown fox jumps over the lazy dog. 0123456789"
 # ===============================
 # === CONSTANTS / DO NOT EDIT ===
 # ===============================
-
-VERSION = "1.1.0"
 
 # File Output
 OUTPUT_FONT_NAME = "Minecraft"

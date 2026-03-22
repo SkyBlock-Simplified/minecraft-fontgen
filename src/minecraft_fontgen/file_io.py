@@ -7,8 +7,8 @@ import numpy as np
 from collections import deque, OrderedDict
 from tqdm import tqdm
 from PIL import Image
-from src.config import COLUMNS_PER_ROW, DEFAULT_GLYPH_SIZE, OUTPUT_DIR, MINECRAFT_JAR_DIR, WORK_DIR, UNITS_PER_EM, UNIFONT_DEBUG_SVG
-from src.functions import get_unicode_codepoint, log, is_silent
+from minecraft_fontgen.config import COLUMNS_PER_ROW, DEFAULT_GLYPH_SIZE, OUTPUT_DIR, MINECRAFT_JAR_DIR, WORK_DIR, UNITS_PER_EM, UNIFONT_DEBUG_SVG
+from minecraft_fontgen.functions import get_unicode_codepoint, log, is_silent
 
 
 def _write_tile_svg(grid, size, output_file):

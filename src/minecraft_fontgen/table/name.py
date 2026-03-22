@@ -1,8 +1,8 @@
 from fontTools.ttLib import newTable
 from fontTools.ttLib.tables._n_a_m_e import makeName
-from src.functions import get_font_type
+from minecraft_fontgen.functions import get_font_type
 
-from src.config import (
+from minecraft_fontgen.config import (
     OUTPUT_FONT_NAME, VERSION,
     MANUFACTURER, DESIGNER,
     VENDOR_URL, DESIGNER_URL,

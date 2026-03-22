@@ -15,35 +15,38 @@ Minecraft-FontGen converts Minecraft's bitmap font glyphs into OpenType (CFF) or
 # Install dependencies
 pip install -r requirements.txt
 
+# Install in editable mode (recommended)
+pip install -e .
+
 # Run the tool (interactive - prompts for Minecraft version)
-python -m src.main
+python -m minecraft_fontgen
 
 # Validate output with FontForge (requires fontforge installed)
-fontforge -lang=py -script src/inspect/validate.py output/Minecraft-Regular.otf
+fontforge -lang=py -script scripts/validate_font.py output/Minecraft-Regular.otf
 ```
 
 There are no tests or linting configured.
 
 ## Architecture
 
-### Pipeline (src/main.py)
+### Pipeline (src/minecraft_fontgen/main.py)
 
 The pipeline runs sequentially through five stages:
 
-1. **Clean** (`src/file_io.py:clean_directories`) - Wipes and recreates `work/` and `output/` directories
-2. **Download** (`src/piston.py:read_minecraft_piston_api`) - User selects a Minecraft version interactively. Downloads version manifest, client JAR, and extracts font assets to `work/`. Then downloads unifont hex files if enabled. Returns the matched font file path, format, and unifont glyph data
-3. **Parse + Slice** (`src/file_io.py:read_providers_from_file`) - Reads `include/default.json` from the extracted JAR to discover bitmap font providers (PNG files + Unicode character mappings). Internally calls `slice_providers_into_tiles` to crop individual glyphs from bitmap PNGs, build pixel grids with flood-fill contour tracing, and generate SVG debug output
-4. **Build glyph map** (`src/file_io.py:build_glyph_map`) - Merges provider glyphs (priority) with unifont fallback glyphs into an `OrderedDict` keyed by codepoint, per style (Regular/Bold). Pre-computes scaled coordinates (pixel space to font units) for all glyphs via `precompute_glyph_scaling`
-5. **Create font files** (`src/font_creator.py:create_font_files`) - Batch creates all enabled font styles (Regular, Bold, Italic, BoldItalic). Initializes fontTools `TTFont` tables for each style, converts glyphs with a single progress bar across all styles, then finalizes and saves all fonts
+1. **Clean** (`minecraft_fontgen.file_io:clean_directories`) - Wipes and recreates `work/` and `output/` directories
+2. **Download** (`minecraft_fontgen.piston:read_minecraft_piston_api`) - User selects a Minecraft version interactively. Downloads version manifest, client JAR, and extracts font assets to `work/`. Then downloads unifont hex files if enabled. Returns the matched font file path, format, and unifont glyph data
+3. **Parse + Slice** (`minecraft_fontgen.file_io:read_providers_from_file`) - Reads `include/default.json` from the extracted JAR to discover bitmap font providers (PNG files + Unicode character mappings). Internally calls `slice_providers_into_tiles` to crop individual glyphs from bitmap PNGs, build pixel grids with flood-fill contour tracing, and generate SVG debug output
+4. **Build glyph map** (`minecraft_fontgen.file_io:build_glyph_map`) - Merges provider glyphs (priority) with unifont fallback glyphs into an `OrderedDict` keyed by codepoint, per style (Regular/Bold). Pre-computes scaled coordinates (pixel space to font units) for all glyphs via `precompute_glyph_scaling`
+5. **Create font files** (`minecraft_fontgen.font_creator:create_font_files`) - Batch creates all enabled font styles (Regular, Bold, Italic, BoldItalic). Initializes fontTools `TTFont` tables for each style, converts glyphs with a single progress bar across all styles, then finalizes and saves all fonts
 
 ### Glyph Processing
 
-- `src/file_io.py:_bitmap_to_pixel_data` - Core contour tracing: flood-fill labels pixel groups, traces boundary edges using right-hand rule, extracts corner points for vector outlines. Bold glyphs get a 1px rightward expansion before tracing
-- `src/file_io.py:precompute_glyph_scaling` - Pre-computes base scaled coordinates (pixel space to font units) for all glyphs during glyph map building. This is style-independent; only italic shear differs and is applied as a lightweight post-transform per font
-- `src/glyph/glyph.py:Glyph` - Assigns pre-computed scaled coordinates, applies italic shear transform if needed, draws via fontTools pen (T2CharStringPen for CFF, TTGlyphPen for TrueType)
-- `src/glyph/glyph_storage.py:GlyphStorage` - Accumulates glyphs, manages cmap table entries (Format 4 for BMP, Format 12 for SMP), writes final glyph order and metrics
+- `minecraft_fontgen.file_io:_bitmap_to_pixel_data` - Core contour tracing: flood-fill labels pixel groups, traces boundary edges using right-hand rule, extracts corner points for vector outlines. Bold glyphs get a 1px rightward expansion before tracing
+- `minecraft_fontgen.file_io:precompute_glyph_scaling` - Pre-computes base scaled coordinates (pixel space to font units) for all glyphs during glyph map building. This is style-independent; only italic shear differs and is applied as a lightweight post-transform per font
+- `minecraft_fontgen.glyph.glyph:Glyph` - Assigns pre-computed scaled coordinates, applies italic shear transform if needed, draws via fontTools pen (T2CharStringPen for CFF, TTGlyphPen for TrueType)
+- `minecraft_fontgen.glyph.glyph_storage:GlyphStorage` - Accumulates glyphs, manages cmap table entries (Format 4 for BMP, Format 12 for SMP), writes final glyph order and metrics
 
-### Font Table Modules (src/table/)
+### Font Table Modules (src/minecraft_fontgen/table/)
 
 Each file creates one OpenType/TrueType table via `fontTools.ttLib.newTable()`. They set initial values; `GlyphStorage.write()` patches final glyph-dependent values (numGlyphs, charIndex ranges, average widths, etc.) after all glyphs are added.
 
@@ -58,7 +61,7 @@ Each file creates one OpenType/TrueType table via `fontTools.ttLib.newTable()`. 
 - `opentype.py` - CFF tables (font set, top dict, charstrings)
 - `truetype.py` - TrueType tables (glyf, loca)
 
-### Key Constants (src/config.py)
+### Key Constants (src/minecraft_fontgen/config.py)
 
 Configuration is module-level constants, not CLI args. Key settings:
 - `OPENTYPE = True` - CFF (OpenType) vs TrueType outlines
@@ -86,7 +89,7 @@ Italic and BoldItalic reuse Regular/Bold pixel data respectively. The italic she
 
 ### Unifont Fallback
 
-When `UNIFONT = True`, GNU Unifont hex files are downloaded from Minecraft's asset index and parsed into 16-row bitmap grids (`src/piston.py:parse_unifont_hex_bytes`). These are converted to tile dicts via `convert_unifont_to_tiles` and merged as fallbacks (lower priority than provider glyphs) in `build_glyph_map`. The `UNIFONT_RANGES` config controls which Unicode ranges are included.
+When `UNIFONT = True`, GNU Unifont hex files are downloaded from Minecraft's asset index and parsed into 16-row bitmap grids (`minecraft_fontgen.piston:parse_unifont_hex_bytes`). These are converted to tile dicts via `convert_unifont_to_tiles` and merged as fallbacks (lower priority than provider glyphs) in `build_glyph_map`. The `UNIFONT_RANGES` config controls which Unicode ranges are included.
 
 ### Directory Layout at Runtime
 
@@ -96,8 +99,8 @@ When `UNIFONT = True`, GNU Unifont hex files are downloaded from Minecraft's ass
 
 ## Dependencies
 
-fontTools (font building), Pillow (bitmap processing), numpy (pixel grid operations), requests (Mojang API downloads), tqdm (progress bars), svgpathtools/uharfbuzz (SVG utilities). Python 3.7+.
+fontTools (font building), Pillow (bitmap processing), numpy (pixel grid operations), requests (Mojang API downloads), tqdm (progress bars), svgpathtools/uharfbuzz (SVG utilities). Python 3.14+.
 
 ## Module Import Style
 
-Source files use absolute imports from `src` (e.g., `from src.config import ...`). There are no `__init__.py` files; the project runs as `python -m src.main`.
+Source files use absolute imports from the `minecraft_fontgen` package (e.g., `from minecraft_fontgen.config import ...`). The project uses the PyPA src layout with `__init__.py` files and runs as `python -m minecraft_fontgen`.

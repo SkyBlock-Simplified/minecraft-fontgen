@@ -1,6 +1,6 @@
 from fontTools.ttLib import newTable
 from fontTools.ttLib.tables._c_m_a_p import CmapSubtable
-from src.config import CREATE_SMP, CREATE_BMP
+from minecraft_fontgen.config import CREATE_SMP, CREATE_BMP
 
 def create_font_mapping_table(font):
     """Creates the 'cmap' table with BMP (Format 4) and/or SMP (Format 12) subtables."""

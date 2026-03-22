@@ -1,6 +1,6 @@
 from fontTools.ttLib import newTable
 
-from src.config import DEFAULT_GLYPH_SIZE
+from minecraft_fontgen.config import DEFAULT_GLYPH_SIZE
 
 def create_font_mprofile_table(font, use_cff: bool = True):
     """Creates the 'maxp' table with glyph limits and memory allocation hints."""
