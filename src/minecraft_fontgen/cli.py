@@ -24,7 +24,7 @@ def _load_env_file(path=".env"):
 
 
 def parse_args():
-    """Parses CLI arguments with env var fallbacks. Returns (silent, output_dir, output_fonts)."""
+    """Parses CLI arguments with env var fallbacks. Returns (silent, output_dir, output_fonts, mc_version)."""
     _load_env_file()
 
     parser = argparse.ArgumentParser(description="Minecraft bitmap font to OpenType/TrueType converter.")
@@ -32,6 +32,8 @@ def parse_args():
                         help="Suppress all output except errors")
     parser.add_argument("--output", type=str, default=None,
                         help="Override output directory")
+    parser.add_argument("--version", type=str, default=None,
+                        help="Minecraft version to use (skips interactive prompt)")
     parser.add_argument("--styles", type=str, default=None,
                         help="Comma-separated font styles: regular,bold,italic,bolditalic")
 
@@ -73,4 +75,12 @@ def parse_args():
     else:
         output_fonts = OUTPUT_FONTS
 
-    return silent, output_dir, output_fonts
+    # --- version ---
+    if args.version is not None:
+        mc_version = args.version
+    elif os.environ.get("FONTGEN_VERSION"):
+        mc_version = os.environ["FONTGEN_VERSION"]
+    else:
+        mc_version = None
+
+    return silent, output_dir, output_fonts, mc_version

@@ -15,14 +15,14 @@ sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="repla
 def main():
     """Runs the font generation pipeline: download, parse, build glyph map, create fonts."""
     # Parse user provided arguments
-    silent, output_dir, output_fonts = parse_args()
+    silent, output_dir, output_fonts, mc_version = parse_args()
     set_silent(silent)
 
     # Clean work and output directories
     clean_directories(output_dir)
 
     # Download MC version, extract unifont + JAR assets
-    matched_file, matched_format, unifont_glyphs = read_minecraft_piston_api()
+    matched_file, matched_format, unifont_glyphs = read_minecraft_piston_api(mc_version)
 
     # Parse provider glyphs from JAR bitmap PNGs (includes slicing)
     providers = read_providers_from_file(matched_file, matched_format)

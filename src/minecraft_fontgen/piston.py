@@ -160,15 +160,22 @@ def fetch_minecraft_versions():
         "snapshots": filter_type("snapshot")
     }
 
-def select_minecraft_version():
-    """Interactively prompts the user to select a Minecraft version."""
+def select_minecraft_version(mc_version=None):
+    """Selects a Minecraft version. Uses mc_version directly if provided, otherwise prompts interactively."""
     versions = fetch_minecraft_versions()
+
+    if mc_version:
+        for version_type in ["releases", "snapshots"]:
+            if mc_version in versions[version_type]:
+                log(f"→ 📂 Using version {mc_version}")
+                return versions[version_type][mc_version]
+        raise RuntimeError(f"Version '{mc_version}' not found in releases or snapshots")
+
     selected_version = None
     selected_data = None
 
     while selected_version is None:
-        #version = input("→ 📂 Enter version number (or 'help'): ").strip().lower()
-        version = "1.21.10"
+        version = input("→ 📂 Enter version number (or 'help'): ").strip().lower()
 
         def dump_versions(_versions):
             #print(f"Found {len(versions)}:")
@@ -215,10 +222,10 @@ def select_minecraft_version():
 
     return selected_data
 
-def read_minecraft_piston_api():
+def read_minecraft_piston_api(mc_version=None):
     """Downloads and extracts Minecraft font assets and unifont fallbacks via the Piston API."""
     log(f"🧩 Processing minecraft piston data...")
-    version_json = select_minecraft_version()
+    version_json = select_minecraft_version(mc_version)
     version_data = fetch_json(version_json["url"], label="version metadata")
 
     if "assetIndex" not in version_data:
