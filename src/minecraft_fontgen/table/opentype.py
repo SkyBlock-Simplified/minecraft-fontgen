@@ -32,6 +32,7 @@ def create_ot_font_tables(font, bold = False, italic = False):
 
     # Rebuild CharStrings
     private = PrivateDict(None, None, 0)
+    private.Subrs = Index()
     fd_array = [FontDict()]
     fd_array[0].Private = private
     fd_select = FDSelect()
