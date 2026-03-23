@@ -1,9 +1,9 @@
 import argparse
 import os
 
-from minecraft_fontgen.config import OUTPUT_DIR, OUTPUT_FONTS
+from minecraft_fontgen.config import OUTPUT_DIR, OPENTYPE, FONT_STYLES
 
-VALID_STYLES = {"regular", "bold", "italic", "bolditalic"}
+VALID_STYLES = {"regular", "bold", "italic", "bolditalic", "galactic", "illageralt"}
 
 
 def _load_env_file(path=".env"):
@@ -24,7 +24,7 @@ def _load_env_file(path=".env"):
 
 
 def parse_args():
-    """Parses CLI arguments with env var fallbacks. Returns (silent, output_dir, output_fonts, mc_version, validate)."""
+    """Parses CLI arguments with env var fallbacks. Returns (silent, output_dir, output_fonts, mc_version, use_cff, output_ext, validate)."""
     _load_env_file()
 
     parser = argparse.ArgumentParser(description="Minecraft bitmap font to OpenType/TrueType converter.")
@@ -36,6 +36,8 @@ def parse_args():
                         help="Minecraft version to use (skips interactive prompt)")
     parser.add_argument("--styles", type=str, default=None,
                         help="Comma-separated font styles: regular,bold,italic,bolditalic")
+    parser.add_argument("--type", type=str, default=None,
+                        help="Font type: opentype/otf or truetype/ttf (default: opentype)")
     parser.add_argument("--validate", action="store_true", default=None,
                         help="Run FontForge validation on generated fonts (requires fontforge)")
 
@@ -71,11 +73,11 @@ def parse_args():
             parser.error(f"Invalid style(s): {', '.join(sorted(invalid))}. "
                          f"Valid options: {', '.join(sorted(VALID_STYLES))}")
         output_fonts = [
-            (name, name.lower() in requested, bold, italic)
-            for name, _, bold, italic in OUTPUT_FONTS
+            {**style, "enabled": style["name"].lower() in requested}
+            for style in FONT_STYLES
         ]
     else:
-        output_fonts = OUTPUT_FONTS
+        output_fonts = FONT_STYLES
 
     # --- version ---
     if args.version is not None:
@@ -85,6 +87,24 @@ def parse_args():
     else:
         mc_version = None
 
+    # --- type ---
+    valid_types = {"opentype": True, "otf": True, "truetype": False, "ttf": False}
+    raw_type = None
+    if args.type is not None:
+        raw_type = args.type
+    elif os.environ.get("FONTGEN_TYPE"):
+        raw_type = os.environ["FONTGEN_TYPE"]
+
+    if raw_type is not None:
+        key = raw_type.strip().lower()
+        if key not in valid_types:
+            parser.error(f"Invalid type: {raw_type}. Valid options: opentype, otf, truetype, ttf")
+        use_cff = valid_types[key]
+    else:
+        use_cff = OPENTYPE
+
+    output_ext = "otf" if use_cff else "ttf"
+
     # --- validate ---
     if args.validate is not None and args.validate:
         validate = True
@@ -93,4 +113,4 @@ def parse_args():
     else:
         validate = False
 
-    return silent, output_dir, output_fonts, mc_version, validate
+    return silent, output_dir, output_fonts, mc_version, use_cff, output_ext, validate
