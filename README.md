@@ -29,7 +29,7 @@ Convert Minecraft's bitmap font glyphs into fully functional OpenType (`.otf`) o
 
 - **Any Minecraft version** - Select any release or snapshot via the Mojang Piston API
 - **OpenType (CFF) or TrueType** - Choose your preferred outline format
-- **Multiple font styles** - Generate Regular, Bold, Italic, and BoldItalic variants
+- **Multiple font styles** - Generate Regular, Bold, Italic, BoldItalic, plus alternate scripts (Galactic, Illageralt) on supported versions
 - **GNU Unifont fallback** - Optionally include thousands of extra Unicode glyphs from [GNU Unifont](https://unifoundry.com/unifont/) for broad script coverage
 - **BMP + SMP support** - Generates cmap Format 4 (Basic Multilingual Plane) and Format 12 (Supplementary Multilingual Plane) tables
 - **Pixel-perfect tracing** - Flood-fill contour tracing converts bitmap pixels into clean vector outlines
@@ -133,10 +133,12 @@ variables, then to `.env` file values, then to built-in defaults.
 |----------|-------------|---------|
 | `--version <version>` | Minecraft version to compile (skips interactive prompt) | Interactive prompt |
 | `--output <path>` | Directory for generated font files | `output` |
-| `--styles <list>` | Comma-separated font styles to generate | `regular,bold,italic,bolditalic` |
+| `--styles <list>` | Comma-separated font styles to generate | All enabled in `config.py` |
+| `--type <type>` | Font type: `opentype`/`otf` or `truetype`/`ttf` | `opentype` |
 | `--silent` | Suppress all output except errors | Disabled |
+| `--validate` | Run FontForge validation after build (requires `fontforge`) | Disabled |
 
-**Styles** accepts any combination of: `regular`, `bold`, `italic`, `bolditalic`.
+**Styles** accepts any combination of: `regular`, `bold`, `italic`, `bolditalic`, `galactic`, `illageralt`.
 
 ```bash
 # Only generate Regular and Bold
@@ -165,7 +167,9 @@ every time.
 | `FONTGEN_VERSION` | Minecraft version to compile | `--version` | `1.21.4` |
 | `FONTGEN_OUTPUT` | Output directory path | `--output` | `dist/fonts` |
 | `FONTGEN_STYLES` | Comma-separated font styles | `--styles` | `regular,bold` |
+| `FONTGEN_TYPE` | Font type: `opentype`/`otf` or `truetype`/`ttf` | `--type` | `opentype` |
 | `FONTGEN_SILENT` | Suppress output (`1`, `true`, or `yes`) | `--silent` | `true` |
+| `FONTGEN_VALIDATE` | Run FontForge validation after build (`1`, `true`, or `yes`) | `--validate` | `false` |
 
 ```bash
 export FONTGEN_VERSION=1.21.4
@@ -184,8 +188,10 @@ modifying your shell environment. The file is loaded automatically at startup.
 # .env
 FONTGEN_VERSION=1.21.4
 FONTGEN_OUTPUT=output
-FONTGEN_STYLES=regular,bold,italic,bolditalic
+FONTGEN_STYLES=regular,bold,italic,bolditalic,galactic,illageralt
+FONTGEN_TYPE=opentype
 FONTGEN_SILENT=false
+FONTGEN_VALIDATE=false
 ```
 
 Values from `.env` will **not** overwrite variables that already exist in your
@@ -212,12 +218,20 @@ output/
 ├── Minecraft-Regular.otf
 ├── Minecraft-Bold.otf
 ├── Minecraft-Italic.otf
-└── Minecraft-BoldItalic.otf
+├── Minecraft-BoldItalic.otf
+├── Minecraft-Galactic.otf      # Minecraft 1.13+ only
+└── Minecraft-Illageralt.otf    # Minecraft 1.13+ only
 ```
 
+> [!NOTE]
+> Galactic (Standard Galactic Alphabet / enchanting table text) and Illageralt
+> (Illager runes) are only available on Minecraft versions that include their
+> font provider JSON files (1.13+). On older versions these styles are
+> automatically skipped.
+
 The file extension is `.otf` for OpenType (CFF) or `.ttf` for TrueType,
-controlled by the `OPENTYPE` constant in
-[`config.py`](src/minecraft_fontgen/config.py).
+controlled by `--type` / `FONTGEN_TYPE` (or the `OPENTYPE` constant in
+[`config.py`](src/minecraft_fontgen/config.py)).
 
 ## Unicode Coverage
 
@@ -403,7 +417,7 @@ docker compose run --rm fontgen
 
 ## How It Works
 
-The tool runs a five-stage pipeline:
+The tool runs a six-stage pipeline:
 
 ```
 1. Clean       Wipes and recreates work/ and output/ directories
@@ -422,13 +436,18 @@ The tool runs a five-stage pipeline:
        ↓
 4. Build       Merges provider glyphs (high priority) with unifont fallback
                glyphs (low priority) into a unified glyph map, keyed by
-               codepoint and grouped by style. Pre-computes scaled coordinates
-               (pixel space → font units) for all glyphs
+               codepoint and grouped by style. Processes alternate fonts
+               (Galactic, Illageralt) by overlaying their glyphs onto the
+               Regular map. Pre-computes scaled coordinates (pixel space →
+               font units) for all glyphs
        ↓
 5. Create      Initializes fontTools TTFont tables for each enabled style,
                converts all glyphs with a single progress bar, applies italic
                shear transforms where needed, then finalizes and saves the
                font files
+       ↓
+6. Validate    (Optional, --validate) Runs FontForge validation on all
+               generated font files, reporting per-glyph errors by type
 ```
 
 ### Glyph Processing
@@ -457,6 +476,7 @@ minecraft-fontgen/
 │   ├── file_io.py           # Bitmap slicing, contour tracing, glyph maps
 │   ├── font_creator.py      # Batch font file creation
 │   ├── functions.py         # Shared utilities (logging, HTTP, codepoints)
+│   ├── validate_font.py    # FontForge validation script (--validate)
 │   ├── glyph/
 │   │   ├── glyph.py         # Glyph scaling, transforms, pen drawing
 │   │   └── glyph_storage.py # Glyph accumulation, cmap, final output
