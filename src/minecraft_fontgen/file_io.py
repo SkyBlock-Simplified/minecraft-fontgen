@@ -478,8 +478,78 @@ def convert_unifont_to_tiles(unifont_glyphs, bold=False):
 
     return tiles
 
+def _split_self_touching(contours):
+    """Splits self-touching contours at duplicate vertices.
+
+    Pixel contour tracing can produce figure-eight paths that revisit the
+    same vertex at pinch points. Each loop becomes its own contour.
+    """
+    result = []
+    for contour in contours:
+        pending = [contour]
+        while pending:
+            c = pending.pop()
+            seen = {}
+            split = False
+            for i, pt in enumerate(c):
+                key = (round(pt[0]), round(pt[1]))
+                if key in seen:
+                    loop = c[seen[key]:i]
+                    rest = c[:seen[key]] + c[i:]
+                    if len(loop) >= 3:
+                        result.append(loop)
+                    if len(rest) >= 3:
+                        pending.append(rest)
+                    split = True
+                    break
+                seen[key] = i
+            if not split and len(c) >= 3:
+                result.append(c)
+
+    return result
+
+def _inset_shared_vertices(scaled_outer, scaled_holes):
+    """Insets shared vertices by 1 font unit along the bisector of adjacent edges.
+
+    Breaks vertex sharing between contours (a pixel font artifact that
+    triggers FontForge's wrong-direction false positive).
+    """
+    all_contours = scaled_outer + scaled_holes
+    if len(all_contours) <= 1:
+        return scaled_outer, scaled_holes
+
+    shared_pts = set()
+    for i, ci in enumerate(all_contours):
+        si = {(round(x), round(y)) for x, y in ci}
+        for j, cj in enumerate(all_contours):
+            if i < j:
+                sj = {(round(x), round(y)) for x, y in cj}
+                shared_pts |= si & sj
+
+    if not shared_pts:
+        return scaled_outer, scaled_holes
+
+    for i, contour in enumerate(all_contours):
+        inset = []
+        n = len(contour)
+        for k, (x, y) in enumerate(contour):
+            if (round(x), round(y)) in shared_pts:
+                px, py = contour[(k - 1) % n]
+                nx, ny = contour[(k + 1) % n]
+                dx = (px - x) + (nx - x)
+                dy = (py - y) + (ny - y)
+                dist = (dx * dx + dy * dy) ** 0.5
+                if dist > 0:
+                    x += dx / dist
+                    y += dy / dist
+            inset.append((x, y))
+        all_contours[i] = inset
+
+    outer_count = len(scaled_outer)
+    return all_contours[:outer_count], all_contours[outer_count:]
+
 def precompute_glyph_scaling(glyph_map):
-    """Pre-computes base scaled coordinates (pixel space to font units) for all glyphs."""
+    """Scales glyph coordinates from pixel space to font units, splits self-touching contours, and insets shared vertices."""
     styles = len(glyph_map)
     per_style = len(next(iter(glyph_map.values())))
     total = per_style * styles
@@ -516,9 +586,16 @@ def precompute_glyph_scaling(glyph_map):
                     x, y = pt
                     return ((x - _min_x) * _sx, (_do - y) * _sy)
 
+                scaled_outer = [[transform(pt) for pt in path] for path in outer_paths]
+                scaled_holes = [[transform(pt) for pt in path] for path in hole_paths]
+
+                scaled_outer = _split_self_touching(scaled_outer)
+                scaled_holes = _split_self_touching(scaled_holes)
+                scaled_outer, scaled_holes = _inset_shared_vertices(scaled_outer, scaled_holes)
+
                 tile["scaled"] = {
-                    "outer": [[transform(pt) for pt in path] for path in outer_paths],
-                    "holes": [[transform(pt) for pt in path] for path in hole_paths]
+                    "outer": scaled_outer,
+                    "holes": scaled_holes
                 }
 
 def build_glyph_map(providers, unifont_glyphs):
