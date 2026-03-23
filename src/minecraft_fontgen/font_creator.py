@@ -18,14 +18,14 @@ from minecraft_fontgen.table.postscript import create_font_pscript_table
 from minecraft_fontgen.table.truetype import create_tt_font_tables
 
 def create_font_files(glyph_map, use_cff, output_fonts, output_dir, output_font_name, output_file_ext):
-    """Creates all enabled font files in batch: initializes tables, converts glyphs, saves."""
+    """Creates all enabled font files in batch: initializes tables, converts glyphs, saves. Returns output file paths."""
     font_icon = "🅾️" if use_cff else "🆎"
     font_type = "OpenType" if use_cff else "TrueType"
     enabled_fonts = [(name, bold, italic) for name, enabled, bold, italic in output_fonts if enabled]
 
     if not enabled_fonts:
         log("→ ⚠️ No font styles enabled.")
-        return
+        return []
 
     log(f"{font_icon} Creating {font_type} font files...")
 
@@ -79,9 +79,14 @@ def create_font_files(glyph_map, use_cff, output_fonts, output_dir, output_font_
 
     # Finalize and save all fonts
     log(f"→ 💾 Saving font files...", flush=True)
+    output_files = []
     for font_style, (storage, _, _) in storages.items():
         output_file = f"{output_font_name}-{font_style}.{output_file_ext}"
+        output_path = f"{output_dir}/{output_file}"
         log(f" → ☕ {output_file}...", flush=True)
         storage.add_notdef()
         storage.write()
-        storage.save(f"{output_dir}/{output_file}")
+        storage.save(output_path)
+        output_files.append(output_path)
+
+    return output_files
