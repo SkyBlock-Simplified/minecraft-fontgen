@@ -43,43 +43,51 @@ class Glyph:
 
         # Draw .notdef
         if self.codepoint == 0x0000:
-            # Draw outer rectangle
-            self.pen.moveTo((NOTDEF_GLYPH[0][0], NOTDEF_GLYPH[0][1]))
-            self.pen.lineTo((NOTDEF_GLYPH[0][0], NOTDEF_GLYPH[0][3]))
-            self.pen.lineTo((NOTDEF_GLYPH[0][2], NOTDEF_GLYPH[0][3]))
-            self.pen.lineTo((NOTDEF_GLYPH[0][2], NOTDEF_GLYPH[0][1]))
-            self.pen.closePath()
+            def draw_rect(rect, ccw):
+                x1, y1, x2, y2 = rect
+                self.pen.moveTo((x1, y1))
+                if ccw:
+                    self.pen.lineTo((x2, y1))
+                    self.pen.lineTo((x2, y2))
+                    self.pen.lineTo((x1, y2))
+                else:
+                    self.pen.lineTo((x1, y2))
+                    self.pen.lineTo((x2, y2))
+                    self.pen.lineTo((x2, y1))
+                self.pen.closePath()
 
-            # Draw inner rectangle
-            self.pen.moveTo((NOTDEF_GLYPH[1][0], NOTDEF_GLYPH[1][1]))
-            self.pen.lineTo((NOTDEF_GLYPH[1][0], NOTDEF_GLYPH[1][3]))
-            self.pen.lineTo((NOTDEF_GLYPH[1][2], NOTDEF_GLYPH[1][3]))
-            self.pen.lineTo((NOTDEF_GLYPH[1][2], NOTDEF_GLYPH[1][1]))
-            self.pen.closePath()
+            # CFF: outer=CCW, hole=CW; TrueType: outer=CW, hole=CCW
+            draw_rect(NOTDEF_GLYPH[0], ccw=self.use_cff)
+            draw_rect(NOTDEF_GLYPH[1], ccw=not self.use_cff)
 
     def draw(self):
-        """
-        Draws the outer contour and holes (as counter-clockwise subpaths) to a fontTools pen.
-        Assumes:
-            - self.corners contains the clockwise outer contour (list of (x, y) tuples)
-            - self.holes is a dict with keys -> {'corners': [...]} representing holes
-        """
-        pen = self.pen
+        """Draws contours with winding based on geometric nesting depth."""
+        if not self.outer_scaled and not self.holes_scaled:
+            return
 
-        def draw_contour(path):
-            if len(path) >= 3:
-                pen.moveTo(path[0])
-                for pt in path[1:]:
-                    pen.lineTo(pt)
-                pen.closePath()
+        all_contours = list(self.outer_scaled) + list(self.holes_scaled)
 
-        # Draw outer shape (must be clockwise)
-        for outer_path in self.outer_scaled:
-            draw_contour(outer_path)
+        for contour in all_contours:
+            if len(contour) < 3:
+                continue
 
-        # Draw holes (must be counter-clockwise)
-        for hole_path in self.holes_scaled:
-            draw_contour(list(reversed(hole_path)))
+            ix, iy = self._interior_point(contour)
+            depth = sum(
+                1 for other in all_contours
+                if other is not contour and self._point_in_polygon(ix, iy, other)
+            )
+
+            # CFF: even depth = CCW, odd depth = CW
+            # TT: even depth = CW, odd depth = CCW
+            want_ccw = (depth % 2 == 0) == self.use_cff
+            sa = self._signed_area(contour)
+            is_ccw = sa > 0
+
+            pts = list(reversed(contour)) if want_ccw != is_ccw else contour
+            self.pen.moveTo(pts[0])
+            for pt in pts[1:]:
+                self.pen.lineTo(pt)
+            self.pen.closePath()
 
     def get(self):
         """Returns the finalized font glyph object (T2CharString for CFF, TTGlyph for TrueType)."""
@@ -128,7 +136,7 @@ class Glyph:
     def write_svg_paths(self, canvas_size=8):
         """
         Outputs a visual SVG of outer and hole paths.
-        Outer paths = black fill, red stroke.
+        Outer paths = black fill, purple stroke.
         Hole paths = white fill, blue stroke.
         """
         def path_to_d(path):
@@ -195,8 +203,82 @@ class Glyph:
     def _new_pen(self):
         """Creates a new fontTools drawing pen (T2CharStringPen for CFF, TTGlyphPen for TrueType)."""
         if self.use_cff:
-            units_per_pixel = UNITS_PER_EM / self.size[0]
-            advance_width = round(self.width * units_per_pixel)
+            if self.codepoint == 0x0020:
+                advance_width = UNITS_PER_EM // 2
+            else:
+                units_per_pixel = UNITS_PER_EM / self.size[0]
+                advance_width = round((self.width + 1) * units_per_pixel)
             return T2CharStringPen(advance_width, None)
         else:
             return TTGlyphPen(None)
+
+    @staticmethod
+    def _interior_point(contour):
+        """Returns a point guaranteed to be inside the contour.
+
+        Needed because the naive approach (centroid) fails for non-convex
+        shapes like C or L, where the centroid can land outside the contour
+        or inside a nested hole.
+
+        Walks each edge, takes its midpoint, and offsets it a tiny amount
+        perpendicular to the edge in both directions. Since edges lie on the
+        boundary, one direction is always interior. Returns the first offset
+        point that _point_in_polygon confirms is inside. Falls back to an
+        epsilon-offset centroid for degenerate polygons.
+        """
+        pip = Glyph._point_in_polygon
+        eps = 0.01
+        for idx in range(len(contour)):
+            p0 = contour[idx]
+            p1 = contour[(idx + 1) % len(contour)]
+            mx = (p0[0] + p1[0]) / 2
+            my = (p0[1] + p1[1]) / 2
+            dx, dy = p1[0] - p0[0], p1[1] - p0[1]
+            if dx == 0 and dy == 0:
+                continue
+            for sign in (1, -1):
+                px = mx + sign * (-dy) * eps
+                py = my + sign * dx * eps
+                if pip(px, py, contour):
+                    return px, py
+        cx = sum(x for x, y in contour) / len(contour) + eps
+        cy = sum(y for x, y in contour) / len(contour) + eps
+        return cx, cy
+
+    @staticmethod
+    def _signed_area(pts):
+        """Returns the signed area of a polygon via the shoelace formula.
+
+        The sign encodes winding direction: positive = CCW, negative = CW
+        in Y-up coordinates. Used by draw() to check whether a contour's
+        current winding matches what FontForge expects for its nesting depth.
+
+        https://en.wikipedia.org/wiki/Shoelace_formula
+        """
+        n = len(pts)
+        return sum(
+            pts[i][0] * pts[(i + 1) % n][1] - pts[(i + 1) % n][0] * pts[i][1]
+            for i in range(n)
+        ) / 2
+
+    @staticmethod
+    def _point_in_polygon(px, py, polygon):
+        """Ray casting point-in-polygon test.
+
+        Shoots a horizontal ray rightward from (px, py) and counts edge
+        crossings: odd = inside, even = outside. Used by draw() to compute
+        nesting depth (how many other contours contain a given contour's
+        interior point).
+
+        https://en.wikipedia.org/wiki/Point_in_polygon#Ray_casting_algorithm
+        """
+        n = len(polygon)
+        inside = False
+        j = n - 1
+        for i in range(n):
+            xi, yi = polygon[i]
+            xj, yj = polygon[j]
+            if ((yi > py) != (yj > py)) and (px < (xj - xi) * (py - yi) / (yj - yi) + xi):
+                inside = not inside
+            j = i
+        return inside
