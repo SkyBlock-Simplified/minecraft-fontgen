@@ -23,12 +23,12 @@ def create_font_metrics_table(font):
     os2.panose.bWeight = 0
     os2.panose.bXHeight = 0
 
-    os2.sCapHeight = int(ASCENT * 0.7) # Typically 70% of ascent
+    os2.sCapHeight = ASCENT # Capital letters reach full ascent in pixel fonts
     os2.sFamilyClass = 0 # Font family group classification (0 for no classification)
     os2.sTypoAscender = ASCENT # Preferred ascent for line layout
     os2.sTypoDescender = DESCENT # Preferred descent for line layout
     os2.sTypoLineGap = 0 # Preferred line gap for layout
-    os2.sxHeight = int(ASCENT * 0.46) # Typically 46% of ascent
+    os2.sxHeight = ASCENT * 5 // 7 # Lowercase x is 5 of 7 rows above baseline in pixel fonts
     os2.ulCodePageRange1 = 0xFFFFFFFF # Bits indicating which Windows code pages are supported
     os2.ulCodePageRange2 = 0xFFFFFFFF # Bits indicating which Windows code pages are supported
     os2.ulUnicodeRange1 = 0xFFFFFFFF # Bits indicating which Unicode blocks are supported
