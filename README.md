@@ -224,8 +224,8 @@ output/
 ```
 
 > [!NOTE]
-> Galactic (Standard Galactic Alphabet / enchanting table text) and Illageralt
-> (Illager runes) are only available on Minecraft versions that include their
+> Galactic (Standard Galactic Alphabet) and Illageralt
+> (Illager Runic Script) are only available on Minecraft versions that include their
 > font provider JSON files (1.13+). On older versions these styles are
 > automatically skipped.
 
