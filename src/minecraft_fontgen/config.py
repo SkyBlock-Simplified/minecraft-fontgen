@@ -4,20 +4,9 @@ from math import atan
 # === RUNTIME CONFIGURATION ===
 # =============================
 
-SILENT_LOG = False
+SILENT_LOG = False # True to disable logging
 OUTPUT_DIR = "output"
-
-# Output Structures
 OPENTYPE = True # False for TrueType
-UNIFONT = True # False to Disable
-CREATE_BMP = True # BMP (Format 4) (U+0000 - U+FFFF)
-CREATE_SMP = True # SMP (Format 12) (U+10000 - U+1FFFF)
-
-# Output Styles
-CREATE_REGULAR = True
-CREATE_BOLD = True
-CREATE_ITALIC = True
-UNIFONT_DEBUG_SVG = False
 
 # ==================================
 # === FONT DETAILS / DO NOT EDIT ===
@@ -40,13 +29,6 @@ SAMPLE_TEXT = "The quick brown fox jumps over the lazy dog. 0123456789"
 
 # File Output
 OUTPUT_FONT_NAME = "Minecraft"
-OUTPUT_FONTS = [
-    ("Regular", CREATE_REGULAR, False, False),
-    ("Bold", CREATE_BOLD, True, False),
-    ("Italic", CREATE_ITALIC, False, True),
-    ("BoldItalic", (CREATE_BOLD and CREATE_ITALIC), True, True)
-]
-OUTPUT_FONT_EXT = "otf" if OPENTYPE else "ttf"
 
 # File Input
 WORK_DIR = "work"
@@ -58,6 +40,86 @@ MINECRAFT_JSON_FILE = f"{MINECRAFT_JAR_DIR}/font/include/default.json"
 UNIFONT_PATH = "minecraft/font/include/unifont.json"
 TEXTURE_PATH = f"{MINECRAFT_JAR_DIR}/textures/font"
 VALIDATE_SCRIPT = "validate_font.py"
+
+# Font Styles (toggle "enabled" to include/exclude a style)
+FONT_STYLES = [
+    {
+        "name": "Regular",
+        "enabled": True,
+        "bold": False,
+        "italic": False,
+        "pixel_style": "Regular",
+        "debug": {
+            "svg": False,
+            "bmp": False,
+            "unifont": False
+        },
+    },
+    {
+        "name": "Bold",
+        "enabled": True,
+        "bold": True,
+        "italic": False,
+        "pixel_style": "Bold",
+        "debug": {
+            "svg": False,
+            "bmp": False,
+            "unifont": False
+        },
+    },
+    {
+        "name": "Italic",
+        "enabled": True,
+        "bold": False,
+        "italic": True,
+        "pixel_style": "Regular",
+        "debug": {
+            "svg": False,
+            "bmp": False,
+            "unifont": False
+        },
+    },
+    {
+        "name": "BoldItalic",
+        "enabled": True,
+        "bold": True,
+        "italic": True,
+        "pixel_style": "Bold",
+        "debug": {
+            "svg": False,
+            "bmp": False,
+            "unifont": False
+        },
+    },
+    {
+        "name": "Galactic",
+        "enabled": True,
+        "bold": False,
+        "italic": False,
+        "pixel_style": "Galactic",
+        "json_file": f"{MINECRAFT_JAR_DIR}/font/alt.json",
+        "map_lowercase": True,  # Duplicate uppercase glyphs onto lowercase codepoints
+        "debug": {
+            "svg": False,
+            "bmp": False,
+            "unifont": False
+        },
+    },
+    {
+        "name": "Illageralt",
+        "enabled": True,
+        "bold": False,
+        "italic": False,
+        "pixel_style": "Illageralt",
+        "json_file": f"{MINECRAFT_JAR_DIR}/font/illageralt.json",
+        "map_lowercase": False,
+        "debug": {
+            "svg": False,
+            "bmp": False,
+            "unifont": False
+        },
+    },
+]
 
 # FontTools Epoch
 MAC_EPOCH = 2082844800 # Seconds since 12:00 midnight, January 1, 1904 UTC
