@@ -6,54 +6,285 @@ import numpy as np
 from collections import deque, OrderedDict
 from tqdm import tqdm
 from PIL import Image
-from minecraft_fontgen.config import COLUMNS_PER_ROW, DEFAULT_GLYPH_SIZE, OUTPUT_DIR, MINECRAFT_JAR_DIR, WORK_DIR, UNITS_PER_EM, UNIFONT_DEBUG_SVG, TEXTURE_PATH
+from minecraft_fontgen.config import COLUMNS_PER_ROW, DEFAULT_GLYPH_SIZE, OUTPUT_DIR, MINECRAFT_JAR_DIR, WORK_DIR, UNITS_PER_EM, TEXTURE_PATH, FONT_STYLES
 from minecraft_fontgen.functions import get_unicode_codepoint, in_unifont_ranges, log, is_silent, parse_json
 
 
-def _write_tile_svg(grid, size, output_file):
-    """Renders a pixel grid as an SVG file with 1x1 rect elements."""
-    width, height = size
+# ==========================================
+# === Stage 1: Clean work/output directories
+# ==========================================
 
-    svg_rects = [
-        f'<rect x="{x}" y="{y}" width="1" height="1" />'
-        for y, row in enumerate(grid)
-        for x, val in enumerate(row)
-        if val >= 1
-    ]
+def clean_directories(output_dir=None):
+    """Removes and recreates the work/ and output/ directories."""
+    if output_dir is None:
+        output_dir = OUTPUT_DIR
 
-    svg = {
-        "xml": f'''<?xml version="1.0" standalone="no"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 {width} {height}" shape-rendering="crispEdges">
-    <g fill="black">
-        {''.join(svg_rects)}
-    </g>
-</svg>
-''',
-        "file": output_file
+    log("🧹 Cleaning work directory...")
+    shutil.rmtree(WORK_DIR, ignore_errors=True)
+    os.makedirs(WORK_DIR, exist_ok=True)
+
+    log("🧹 Cleaning output directory...")
+    shutil.rmtree(output_dir, ignore_errors=True)
+    os.makedirs(output_dir, exist_ok=True)
+
+
+# ==========================================
+# === Stage 2: Parse providers + slice tiles
+# ==========================================
+
+def parse_provider_file(file, format):
+    """Reads a font provider file, parses it by format, and slices into glyph tiles."""
+    log(f"🧩 Parsing {file}...")
+    with open(file, "rb") as f:
+        raw_bytes = f.read()
+
+    log(f"→ 🛠️ Decoding {format}...")
+    if format == "bin":
+        providers = parse_bin_providers(raw_bytes)
+    elif format == "json":
+        providers = parse_json_providers(raw_bytes)
+    else:
+        raise ValueError(f"Unsupported file format: {format}")
+
+    slice_provider_tiles(providers)
+    return providers
+
+def parse_bin_providers(byte_data):
+    """Parses legacy binary glyph_sizes.bin format (Minecraft 1.8.9 and earlier).
+
+    Scans for ascii.png (8x8 glyphs) and unicode_page_XX.png (16x16 glyphs)
+    in the extracted font textures directory. Creates provider dicts compatible
+    with the JSON provider pipeline.
+    """
+    glyph_widths = list(byte_data)
+    providers = []
+
+    glyph_count = sum(1 for w in glyph_widths if w != 0)
+    log(f"→ 🛠️ Parsing bitmap providers ({glyph_count} non-empty in glyph_sizes.bin)...")
+
+    # 1. Discover unicode_page_XX.png files (16x16 glyphs, 256 chars per page)
+    #    Added first so ascii.png can override codepoints 0-255
+    with tqdm(range(256), desc=" → 🔢 Pages", unit="page",
+              ncols=80, leave=False, file=sys.stdout, disable=is_silent()) as pages_progress:
+        for page in pages_progress:
+            page_hex = f"{page:02x}"
+            pages_progress.set_description(f" → 🔢 Page {page_hex}")
+            page_file = f"unicode_page_{page_hex}.png"
+            page_path = f"{TEXTURE_PATH}/{page_file}"
+
+            if not os.path.isfile(page_path):
+                continue
+
+            base_cp = page * 256
+            chars = []
+            for i in range(256):
+                cp = base_cp + i
+                if cp < len(glyph_widths) and glyph_widths[cp] != 0 and in_unifont_ranges(cp):
+                    chars.append(chr(cp))
+                else:
+                    chars.append(chr(0))
+
+            valid_count = sum(1 for c in chars if c != chr(0))
+            if valid_count == 0:
+                continue
+
+            name = f"unicode_page_{page_hex}"
+            output = f"{WORK_DIR}/glyphs/{name}"
+            os.makedirs(output, exist_ok=True)
+
+            providers.append({
+                "ascent": 15,
+                "height": 16,
+                "chars": chars,
+                "file_name": page_file,
+                "file_path": page_path,
+                "name": name,
+                "output": output,
+                "tiles": []
+            })
+
+    unicode_glyph_count = sum(sum(1 for c in p["chars"] if c != chr(0)) for p in providers)
+    log(f" → 🔢 Detected {unicode_glyph_count} glyphs across {len(providers)} unicode pages...")
+
+    # 2. ascii.png (8x8 glyphs, codepoints 0-255)
+    #    Added last so it takes priority over unicode_page_00 for overlapping codepoints
+    name = "ascii"
+    ascii_file = f"{name}.png"
+    ascii_path = f"{TEXTURE_PATH}/{ascii_file}"
+
+    if os.path.isfile(ascii_path):
+        chars = [chr(i) for i in range(256)]
+        name = "ascii"
+        output = f"{WORK_DIR}/glyphs/{name}"
+        os.makedirs(output, exist_ok=True)
+
+        log(f" → 🔢 Detected 256 glyphs in {ascii_file}...")
+
+        providers.append({
+            "ascent": 7,
+            "height": 8,
+            "chars": chars,
+            "file_name": ascii_file,
+            "file_path": ascii_path,
+            "name": name,
+            "output": output,
+            "tiles": []
+        })
+
+    return providers
+
+def parse_json_providers(byte_data):
+    """Parses the JSON font provider format (default.json) into a list of provider dicts."""
+    raw_text = byte_data.decode("utf-8", errors="surrogatepass")
+    data = parse_json(raw_text)
+
+    log("→ 🛠️ Parsing bitmap providers...")
+    providers = []
+    for provider in data.get("providers", []):
+        if provider.get("type") == "bitmap" and "chars" in provider:
+            file_name = provider.get("file", "minecraft:font/").split("minecraft:font/")[-1]
+            name = os.path.splitext(file_name)[0]
+            output = f"{WORK_DIR}/glyphs/{name}"
+
+            # Create provider directory
+            os.makedirs(output, exist_ok=True)
+
+            # Read unicode characters
+            chars = [char for row in provider.get("chars", []) for char in row]
+            log(f" → 🔢 Detected {len(chars)} unicode characters in '{name}'...")
+
+            providers.append({
+                "ascent": provider.get("ascent", 0),
+                "height": provider.get("height", DEFAULT_GLYPH_SIZE),
+                "chars": chars,
+                "file_name": file_name,
+                "file_path": f"{MINECRAFT_JAR_DIR}/textures/font/{file_name}",
+                "name": name,
+                "output": output,
+                "tiles": []
+            })
+
+    return providers
+
+def slice_provider_tiles(providers):
+    """Slices each provider's bitmap PNG into individual glyph tiles with contour and SVG data."""
+    log(f"→ ✂️ Slicing bitmap providers into tiles...")
+
+    debug_svg_regular = any(s.get("debug", {}).get("svg") for s in FONT_STYLES if s["pixel_style"] == "Regular")
+    debug_svg_bold = any(s.get("debug", {}).get("svg") for s in FONT_STYLES if s["pixel_style"] == "Bold")
+    debug_svg = debug_svg_regular or debug_svg_bold
+    debug_bmp = any(s.get("debug", {}).get("bmp") for s in FONT_STYLES)
+
+    for provider in providers:
+        bitmap = binarize_provider_bitmap(provider)
+        tiles = []
+
+        # Calculate tile dimensions
+        width, height = bitmap.size
+        glyph_width = width / COLUMNS_PER_ROW
+
+        with tqdm(enumerate(provider["chars"]), total=len(provider["chars"]),
+                  desc=f" → 🔣 {provider['file_name']}", unit="tile",
+                  ncols=80, leave=False, file=sys.stdout, disable=is_silent()) as tiles_progress:
+            for i, unicode in tiles_progress:
+                # Skip .notdef
+                codepoint = get_unicode_codepoint(unicode)
+                if codepoint == 0x0000:
+                    continue
+
+                # Update progress bar
+                tiles_progress.set_description(f" → 🔣 0x{codepoint:02X}")
+
+                # Collate tile data
+                tile_row = i // COLUMNS_PER_ROW
+                tile_column = i % COLUMNS_PER_ROW
+                tile = {
+                    "unicode": unicode,
+                    "codepoint": codepoint,
+                    "size": (glyph_width, provider.get("height")),
+                    "ascent": provider.get("ascent", 0),
+                    "location": (tile_column, tile_row),
+                    "output": f"{provider['output']}/tiles/{tile_row:02}_{tile_column:02}_{codepoint:04X}"
+                }
+                tiles.append(tile)
+
+                # Crop tile bitmap from full bitmap
+                tile["bitmap"] = crop_tile(bitmap, tile, save=debug_bmp)
+
+                # Trace contours for regular and bold styles
+                tile["pixels"] = trace_tile_contours(tile)
+
+                # Create svg debug output
+                tile["svg"] = None
+                if debug_svg:
+                    if not debug_bmp:
+                        os.makedirs(tile["output"], exist_ok=True)
+                    svg = {}
+                    if debug_svg_regular:
+                        svg["regular"] = _write_tile_svg(tile["pixels"]["regular"]["grid"], tile["size"], f"{tile['output']}/regular.svg")
+                    if debug_svg_bold:
+                        svg["bold"] = _write_tile_svg(tile["pixels"]["bold"]["grid"], tile["size"], f"{tile['output']}/bold.svg")
+                    tile["svg"] = svg
+
+        provider["tiles"] = tiles
+
+    total_tiles = sum(len(p["tiles"]) for p in providers)
+    log(f" → 🔢 Sliced {total_tiles} glyphs across {len(providers)} providers...")
+
+def binarize_provider_bitmap(provider):
+    """Reads a provider PNG, composites over black, inverts to black-on-white, and binarizes."""
+    img = Image.open(provider["file_path"]).convert("RGBA")
+
+    # Composite white glyphs over black background
+    bg = Image.new("RGBA", img.size, (0, 0, 0, 255)) # Black background
+    img = Image.alpha_composite(bg, img).convert("L") # 1-bit grayscale
+
+    # Invert white glyphs to black
+    img = Image.eval(img, lambda x: 255 - x)
+
+    # Binarize to 1-bit: make black glyphs (0) on white (255)
+    img = img.point(lambda x: 0 if x < 128 else 255, '1')
+
+    # Copy original and save grayscale
+    output_file = provider["output"] + "/" + provider["name"]
+    shutil.copyfile(provider["file_path"], output_file + ".png")
+    img.save(f"{output_file}_grayscale.png")
+
+    return img
+
+def crop_tile(bitmap, tile, save=True):
+    """Crops a single glyph tile from a full provider bitmap and optionally saves it to disk."""
+    x, y = tile["location"]
+    width, height = tile["size"]
+    glyph_width = int(width)
+    px, py = (x * glyph_width, y * height)
+
+    bitmap = {
+        "image": bitmap.crop((px, py, px + glyph_width, py + height)),
+        "file": f"{tile['output']}/glyph.bmp"
     }
 
-    with open(svg["file"], "w", encoding="utf-8") as f:
-        f.write(svg["xml"])
+    if save:
+        os.makedirs(tile["output"], exist_ok=True)
+        bitmap["image"].save(bitmap["file"])
+    return bitmap
 
-    return svg
-
-def convert_tile_into_svg(tile):
-    """Generates SVG debug output for both regular and bold styles of a tile."""
+def trace_tile_contours(tile):
+    """Traces contours from a tile's bitmap for both regular and bold styles."""
     return {
-        "regular": _write_tile_svg(tile["pixels"]["regular"]["grid"], tile["size"], f"{tile['output']}/regular.svg"),
-        "bold": _write_tile_svg(tile["pixels"]["bold"]["grid"], tile["size"], f"{tile['output']}/bold.svg")
+        "regular": _trace_tile_style(tile, False),
+        "bold": _trace_tile_style(tile, True)
     }
 
-def convert_tile_into_pixels(tile):
-    """Converts a tile's bitmap image to pixel data for both regular and bold styles."""
-    return {
-        "regular": _convert_tile_into_pixels(tile, False),
-        "bold": _convert_tile_into_pixels(tile, True)
-    }
+def _trace_tile_style(tile, bold: bool = False):
+    """Converts a tile's PIL bitmap image to a binary numpy grid and traces its contours."""
+    bitmap_grid = np.array(tile["bitmap"]["image"].convert("L"), dtype=int)
+    bitmap_grid = (bitmap_grid < 128).astype(np.uint8)
+    return _trace_bitmap_contours(bitmap_grid, bold)
 
-def _bitmap_to_pixel_data(bitmap_grid, bold: bool = False):
+def _trace_bitmap_contours(bitmap_grid, bold: bool = False):
     """Traces contours from a binary bitmap grid using flood-fill labeling and right-hand edge
-    tracing. Returns pixel data with labeled grid, path corners, hole corners, advance width,
+    tracing. Returns contour data with labeled grid, path corners, hole corners, advance width,
     and left side bearing for font glyph construction.
     """
     height, width = bitmap_grid.shape
@@ -218,250 +449,110 @@ def _bitmap_to_pixel_data(bitmap_grid, bold: bool = False):
         "holes": {label: get_path_data(pixel_grid, label) for label in hole_labels}
     }
 
-def _convert_tile_into_pixels(tile, bold: bool = False):
-    """Converts a tile's PIL bitmap image to a binary numpy grid and processes it into pixel data."""
-    bitmap_grid = np.array(tile["bitmap"]["image"].convert("L"), dtype=int)
-    bitmap_grid = (bitmap_grid < 128).astype(np.uint8)
-    return _bitmap_to_pixel_data(bitmap_grid, bold)
+def _write_tile_svg(grid, size, output_file):
+    """Renders a pixel grid as an SVG file with 1x1 rect elements."""
+    width, height = size
 
-def crop_tile_from_bitmap(bitmap, tile):
-    """Crops a single glyph tile from a full provider bitmap and saves it to disk."""
-    x, y = tile["location"]
-    width, height = tile["size"]
-    glyph_width = int(width)
-    px, py = (x * glyph_width, y * height)
+    svg_rects = [
+        f'<rect x="{x}" y="{y}" width="1" height="1" />'
+        for y, row in enumerate(grid)
+        for x, val in enumerate(row)
+        if val >= 1
+    ]
 
-    bitmap = {
-        "image": bitmap.crop((px, py, px + glyph_width, py + height)),
-        "file": f"{tile['output']}/glyph.bmp"
+    svg = {
+        "xml": f'''<?xml version="1.0" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 {width} {height}" shape-rendering="crispEdges">
+    <g fill="black">
+        {''.join(svg_rects)}
+    </g>
+</svg>
+''',
+        "file": output_file
     }
 
-    # Save bitmap
-    os.makedirs(tile["output"], exist_ok=True)
-    bitmap["image"].save(bitmap["file"])
-    return bitmap
+    with open(svg["file"], "w", encoding="utf-8") as f:
+        f.write(svg["xml"])
 
-def read_provider_bitmap(provider):
-    """Reads a provider PNG, composites over black, inverts to black-on-white, and binarizes."""
-    img = Image.open(provider["file_path"]).convert("RGBA")
+    return svg
 
-    # Composite white glyphs over black background
-    bg = Image.new("RGBA", img.size, (0, 0, 0, 255)) # Black background
-    img = Image.alpha_composite(bg, img).convert("L") # 1-bit grayscale
 
-    # Invert white glyphs to black
-    img = Image.eval(img, lambda x: 255 - x)
+# ==========================================
+# === Stage 3: Build unified glyph map
+# ==========================================
 
-    # Binarize to 1-bit: make black glyphs (0) on white (255)
-    img = img.point(lambda x: 0 if x < 128 else 255, '1')
+def build_glyph_map(providers, unifont_glyphs):
+    """Builds a unified glyph map merging provider glyphs (priority) with unifont fallbacks and alternate fonts."""
+    log(f"🧩 Building unified glyph map...")
+    glyph_map = {"Regular": OrderedDict(), "Bold": OrderedDict()}
 
-    # Copy original and save grayscale
-    output_file = provider["output"] + "/" + provider["name"]
-    shutil.copyfile(provider["file_path"], output_file + ".png")
-    img.save(f"{output_file}_grayscale.png")
-
-    return img
-
-def slice_providers_into_tiles(providers):
-    """Slices each provider's bitmap PNG into individual glyph tiles with pixel and SVG data."""
-    log(f"→ ✂️ Slicing bitmap providers into tiles...")
-
+    # 1. Add provider glyphs (priority - added first)
     for provider in providers:
-        bitmap = read_provider_bitmap(provider)
-        tiles = []
-
-        # Calculate tile dimensions
-        width, height = bitmap.size
-        glyph_width = width / COLUMNS_PER_ROW
-
-        with tqdm(enumerate(provider["chars"]), total=len(provider["chars"]),
-                  desc=f" → 🔣 {provider['file_name']}", unit="tile",
-                  ncols=80, leave=False, file=sys.stdout, disable=is_silent()) as tiles_progress:
-            for i, unicode in tiles_progress:
-                # Skip .notdef
-                codepoint = get_unicode_codepoint(unicode)
-                if codepoint == 0x0000:
-                    continue
-
-                # Update progress bar
-                tiles_progress.set_description(f" → 🔣 0x{codepoint:02X}")
-
-                # Collate tile data
-                tile_row = i // COLUMNS_PER_ROW
-                tile_column = i % COLUMNS_PER_ROW
-                tile = {
-                    "unicode": unicode,
-                    "codepoint": codepoint,
-                    "size": (glyph_width, provider.get("height")),
-                    "ascent": provider.get("ascent", 0),
-                    "location": (tile_column, tile_row),
-                    "output": f"{provider['output']}/tiles/{tile_row:02}_{tile_column:02}_{codepoint:04X}"
+        for tile in provider["tiles"]:
+            cp = tile["codepoint"]
+            for style_key in ("Regular", "Bold"):
+                style = style_key.lower()
+                flat_tile = {
+                    "unicode": tile["unicode"],
+                    "codepoint": cp,
+                    "size": tile["size"],
+                    "ascent": tile["ascent"],
+                    "pixels": tile["pixels"][style],
+                    "svg": tile["svg"].get(style) if tile.get("svg") else None,
+                    "source": "provider"
                 }
-                tiles.append(tile)
+                glyph_map[style_key][cp] = flat_tile
 
-                # Crop tile bitmap from full bitmap
-                tile["bitmap"] = crop_tile_from_bitmap(bitmap, tile)
+    provider_count = len(glyph_map["Regular"])
+    log(f"→ 🔣 {provider_count} provider glyphs (priority)")
 
-                # Create pixel grid and collect hole data
-                tile["pixels"] = convert_tile_into_pixels(tile)
+    # 2. Add unifont glyphs (fallback - skip if codepoint exists)
+    if unifont_glyphs:
+        log(f"→ 🔣 Processing unifont fallback glyphs...")
+        for style_key, bold in [("Regular", False), ("Bold", True)]:
+            unifont_tiles = trace_unifont_tiles(unifont_glyphs, bold)
+            for cp, tile in unifont_tiles.items():
+                if cp not in glyph_map[style_key]:
+                    glyph_map[style_key][cp] = tile
 
-                # Create svg xml and files
-                tile["svg"] = convert_tile_into_svg(tile)
+    # 3. Sort by codepoint
+    for key in glyph_map:
+        glyph_map[key] = OrderedDict(sorted(glyph_map[key].items()))
 
-        provider["tiles"] = tiles
+    # 4. Process alternate fonts (Galactic, Illageralt)
+    for style in FONT_STYLES:
+        if "json_file" not in style or not style["enabled"]:
+            continue
+        overlay = _process_alternate_font(style, glyph_map["Regular"])
+        if overlay is not None:
+            glyph_map[style["name"]] = overlay
 
-    total_tiles = sum(len(p["tiles"]) for p in providers)
-    log(f" → 🔢 Sliced {total_tiles} glyphs across {len(providers)} providers...")
+    # 5. Print summary
+    unifont_count = sum(1 for t in glyph_map["Regular"].values() if t["source"] == "unifont")
+    total = len(glyph_map["Regular"])
+    log(f"→ 🔢 Prepared {total} glyphs ({provider_count} provider, {unifont_count} unifont)")
 
-def read_providers_from_bin(byte_data):
-    """Parses legacy binary glyph_sizes.bin format (Minecraft 1.8.9 and earlier).
+    # 6. Pre-compute scaling
+    precompute_glyph_scaling(glyph_map)
 
-    Scans for ascii.png (8x8 glyphs) and unicode_page_XX.png (16x16 glyphs)
-    in the extracted font textures directory. Creates provider dicts compatible
-    with the JSON provider pipeline.
-    """
-    glyph_widths = list(byte_data)
-    providers = []
+    return glyph_map
 
-    glyph_count = sum(1 for w in glyph_widths if w != 0)
-    log(f"→ 🛠️ Parsing bitmap providers ({glyph_count} non-empty in glyph_sizes.bin)...")
-
-    # 1. Discover unicode_page_XX.png files (16x16 glyphs, 256 chars per page)
-    #    Added first so ascii.png can override codepoints 0-255
-    with tqdm(range(256), desc=" → 🔢 Pages", unit="page",
-              ncols=80, leave=False, file=sys.stdout, disable=is_silent()) as pages_progress:
-        for page in pages_progress:
-            page_hex = f"{page:02x}"
-            pages_progress.set_description(f" → 🔢 Page {page_hex}")
-            page_file = f"unicode_page_{page_hex}.png"
-            page_path = f"{TEXTURE_PATH}/{page_file}"
-
-            if not os.path.isfile(page_path):
-                continue
-
-            base_cp = page * 256
-            chars = []
-            for i in range(256):
-                cp = base_cp + i
-                if cp < len(glyph_widths) and glyph_widths[cp] != 0 and in_unifont_ranges(cp):
-                    chars.append(chr(cp))
-                else:
-                    chars.append(chr(0))
-
-            valid_count = sum(1 for c in chars if c != chr(0))
-            if valid_count == 0:
-                continue
-
-            name = f"unicode_page_{page_hex}"
-            output = f"{WORK_DIR}/glyphs/{name}"
-            os.makedirs(output, exist_ok=True)
-
-            providers.append({
-                "ascent": 15,
-                "height": 16,
-                "chars": chars,
-                "file_name": page_file,
-                "file_path": page_path,
-                "name": name,
-                "output": output,
-                "tiles": []
-            })
-
-    unicode_glyph_count = sum(sum(1 for c in p["chars"] if c != chr(0)) for p in providers)
-    log(f" → 🔢 Detected {unicode_glyph_count} glyphs across {len(providers)} unicode pages...")
-
-    # 2. ascii.png (8x8 glyphs, codepoints 0-255)
-    #    Added last so it takes priority over unicode_page_00 for overlapping codepoints
-    name = "ascii"
-    ascii_file = f"{name}.png"
-    ascii_path = f"{TEXTURE_PATH}/{ascii_file}"
-
-    if os.path.isfile(ascii_path):
-        chars = [chr(i) for i in range(256)]
-        name = "ascii"
-        output = f"{WORK_DIR}/glyphs/{name}"
-        os.makedirs(output, exist_ok=True)
-
-        log(f" → 🔢 Detected 256 glyphs in {ascii_file}...")
-
-        providers.append({
-            "ascent": 7,
-            "height": 8,
-            "chars": chars,
-            "file_name": ascii_file,
-            "file_path": ascii_path,
-            "name": name,
-            "output": output,
-            "tiles": []
-        })
-
-    return providers
-
-def read_providers_from_json(byte_data):
-    """Parses the JSON font provider format (default.json) into a list of provider dicts."""
-    raw_text = byte_data.decode("utf-8", errors="surrogatepass")
-    data = parse_json(raw_text)
-
-    log("→ 🛠️ Parsing bitmap providers...")
-    providers = []
-    for provider in data.get("providers", []):
-        if provider.get("type") == "bitmap" and "chars" in provider:
-            file_name = provider.get("file", "minecraft:font/").split("minecraft:font/")[-1]
-            name = os.path.splitext(file_name)[0]
-            output = f"{WORK_DIR}/glyphs/{name}"
-
-            # Create provider directory
-            os.makedirs(output, exist_ok=True)
-
-            # Read unicode characters
-            chars = [char for row in provider.get("chars", []) for char in row]
-            log(f" → 🔢 Detected {len(chars)} unicode characters in '{name}'...")
-
-            providers.append({
-                "ascent": provider.get("ascent", 0),
-                "height": provider.get("height", DEFAULT_GLYPH_SIZE),
-                "chars": chars,
-                "file_name": file_name,
-                "file_path": f"{MINECRAFT_JAR_DIR}/textures/font/{file_name}",
-                "name": name,
-                "output": output,
-                "tiles": []
-            })
-
-    return providers
-
-def read_providers_from_file(file, format):
-    """Reads a font provider file, parses it by format, and slices into glyph tiles."""
-    log(f"🧩 Parsing {file}...")
-    with open(file, "rb") as f:
-        raw_bytes = f.read()
-
-    log(f"→ 🛠️ Decoding {format}...")
-    if format == "bin":
-        providers = read_providers_from_bin(raw_bytes)
-    elif format == "json":
-        providers = read_providers_from_json(raw_bytes)
-    else:
-        raise ValueError(f"Unsupported file format: {format}")
-
-    slice_providers_into_tiles(providers)
-    return providers
-
-def convert_unifont_to_tiles(unifont_glyphs, bold=False):
-    """Converts parsed unifont hex bitmap data into tile dicts with pixel data."""
+def trace_unifont_tiles(unifont_glyphs, bold=False):
+    """Traces contours from parsed unifont hex bitmap data into tile dicts."""
     tiles = {}
     style_label = "Bold" if bold else "Regular"
+    debug_unifont = any(s.get("debug", {}).get("unifont") for s in FONT_STYLES if s["pixel_style"] == style_label)
 
     with tqdm(unifont_glyphs.items(), total=len(unifont_glyphs),
               desc=f" → 🔣 {style_label}", unit="glyph",
               ncols=80, leave=False, file=sys.stdout, disable=is_silent()) as progress:
         for codepoint, bitmap_rows in progress:
             bitmap_grid = np.array(bitmap_rows, dtype=np.uint8)
-            pixel_data = _bitmap_to_pixel_data(bitmap_grid, bold)
+            pixel_data = _trace_bitmap_contours(bitmap_grid, bold)
             width = len(bitmap_rows[0]) if bitmap_rows else 8
 
             svg = None
-            if UNIFONT_DEBUG_SVG:
+            if debug_unifont:
                 output = f"{WORK_DIR}/glyphs/unifont/{style_label.lower()}/{codepoint:04X}"
                 os.makedirs(output, exist_ok=True)
                 svg = _write_tile_svg(pixel_data["grid"], (width, 16), f"{output}/{style_label.lower()}.svg")
@@ -477,6 +568,158 @@ def convert_unifont_to_tiles(unifont_glyphs, bold=False):
             }
 
     return tiles
+
+def _process_alternate_font(alt_config, regular_map):
+    """Processes an alternate font by cloning Regular and overlaying alternate glyphs.
+
+    Reads the alternate font's JSON provider file to get char mappings, processes
+    its bitmap PNG into tiles, then overlays those tiles onto a copy of the Regular
+    glyph map. Returns the overlay map, or None if the assets are missing.
+    """
+    name = alt_config["name"]
+    json_file = alt_config["json_file"]
+    map_lowercase = alt_config.get("map_lowercase", False)
+
+    if not os.path.isfile(json_file):
+        return None
+
+    with open(json_file, "rb") as f:
+        raw_text = f.read().decode("utf-8", errors="surrogatepass")
+    data = parse_json(raw_text)
+
+    # Find the bitmap provider in the JSON
+    bitmap_provider = None
+    for provider in data.get("providers", []):
+        if provider.get("type") == "bitmap" and "chars" in provider:
+            bitmap_provider = provider
+            break
+
+    if not bitmap_provider:
+        return None
+
+    # Resolve the texture file path
+    file_name = bitmap_provider.get("file", "").split("minecraft:font/")[-1]
+    texture_path = f"{TEXTURE_PATH}/{file_name}"
+    if not os.path.isfile(texture_path):
+        return None
+
+    ascent = bitmap_provider.get("ascent", 7)
+    height = bitmap_provider.get("height", DEFAULT_GLYPH_SIZE)
+    chars = [char for row in bitmap_provider.get("chars", []) for char in row]
+
+    # Read and process the bitmap
+    img = Image.open(texture_path).convert("RGBA")
+    bg = Image.new("RGBA", img.size, (0, 0, 0, 255))
+    img = Image.alpha_composite(bg, img).convert("L")
+    img = Image.eval(img, lambda x: 255 - x)
+    img = img.point(lambda x: 0 if x < 128 else 255, '1')
+
+    img_width, img_height = img.size
+    glyph_width = img_width / COLUMNS_PER_ROW
+
+    # Process each glyph tile
+    alt_tiles = {}
+    for i, unicode_char in enumerate(chars):
+        codepoint = get_unicode_codepoint(unicode_char)
+        if codepoint is None or codepoint == 0x0000:
+            continue
+
+        tile_row = i // COLUMNS_PER_ROW
+        tile_column = i % COLUMNS_PER_ROW
+        px, py = (int(tile_column * glyph_width), tile_row * height)
+        tile_img = img.crop((px, py, px + int(glyph_width), py + height))
+
+        bitmap_grid = np.array(tile_img.convert("L"), dtype=int)
+        bitmap_grid = (bitmap_grid < 128).astype(np.uint8)
+        pixel_data = _trace_bitmap_contours(bitmap_grid, bold=False)
+
+        tile = {
+            "unicode": unicode_char,
+            "codepoint": codepoint,
+            "size": (glyph_width, height),
+            "ascent": ascent,
+            "pixels": pixel_data,
+            "svg": None,
+            "source": "alternate"
+        }
+        alt_tiles[codepoint] = tile
+
+    if not alt_tiles:
+        return None
+
+    # If map_lowercase, duplicate uppercase glyphs onto lowercase codepoints
+    if map_lowercase:
+        for cp in list(alt_tiles.keys()):
+            if 0x41 <= cp <= 0x5A:  # A-Z
+                lower_cp = cp + 0x20  # a-z
+                if lower_cp not in alt_tiles:
+                    lower_tile = dict(alt_tiles[cp])
+                    lower_tile["unicode"] = chr(lower_cp)
+                    lower_tile["codepoint"] = lower_cp
+                    alt_tiles[lower_cp] = lower_tile
+
+    # Clone Regular and overlay alternate tiles
+    overlay_map = OrderedDict()
+    for cp, tile in regular_map.items():
+        if cp in alt_tiles:
+            overlay_map[cp] = alt_tiles[cp]
+        else:
+            overlay_map[cp] = tile
+
+    override_count = sum(1 for cp in alt_tiles if cp in regular_map)
+    log(f"→ 🔣 {name}: {len(alt_tiles)} alternate glyphs ({override_count} overriding Regular)")
+
+    return overlay_map
+
+def precompute_glyph_scaling(glyph_map):
+    """Scales glyph coordinates from pixel space to font units, splits self-touching contours, and insets shared vertices."""
+    styles = len(glyph_map)
+    per_style = len(next(iter(glyph_map.values())))
+    total = per_style * styles
+    log(f"→ ✖️ Pre-scaling {per_style} glyphs ({styles} styles)...")
+
+    with tqdm(total=total, desc=" → 🔣 Scaling", unit="glyph",
+              ncols=80, leave=False, file=sys.stdout, disable=is_silent()) as progress:
+        for style_key in glyph_map:
+            for cp, tile in glyph_map[style_key].items():
+                progress.update(1)
+                pixels = tile.get("pixels")
+                if not pixels:
+                    tile["scaled"] = {"outer": [], "holes": []}
+                    continue
+
+                paths = pixels.get("paths", {})
+                holes = pixels.get("holes", {})
+
+                outer_paths = [p["corners"] for p in paths.values() if len(p.get("corners", [])) >= 3]
+                hole_paths = [h["corners"] for h in holes.values() if len(h.get("corners", [])) >= 3]
+
+                all_points = [pt for path in outer_paths + hole_paths for pt in path]
+                if not all_points:
+                    tile["scaled"] = {"outer": [], "holes": []}
+                    continue
+
+                min_x = min(x for x, y in all_points)
+                width, height = tile["size"]
+                scale_x = UNITS_PER_EM / width
+                scale_y = UNITS_PER_EM / height
+                descender_offset = height - 1
+
+                def transform(pt, _min_x=min_x, _sx=scale_x, _sy=scale_y, _do=descender_offset):
+                    x, y = pt
+                    return ((x - _min_x) * _sx, (_do - y) * _sy)
+
+                scaled_outer = [[transform(pt) for pt in path] for path in outer_paths]
+                scaled_holes = [[transform(pt) for pt in path] for path in hole_paths]
+
+                scaled_outer = _split_self_touching(scaled_outer)
+                scaled_holes = _split_self_touching(scaled_holes)
+                scaled_outer, scaled_holes = _inset_shared_vertices(scaled_outer, scaled_holes)
+
+                tile["scaled"] = {
+                    "outer": scaled_outer,
+                    "holes": scaled_holes
+                }
 
 def _split_self_touching(contours):
     """Splits self-touching contours at duplicate vertices.
@@ -547,114 +790,3 @@ def _inset_shared_vertices(scaled_outer, scaled_holes):
 
     outer_count = len(scaled_outer)
     return all_contours[:outer_count], all_contours[outer_count:]
-
-def precompute_glyph_scaling(glyph_map):
-    """Scales glyph coordinates from pixel space to font units, splits self-touching contours, and insets shared vertices."""
-    styles = len(glyph_map)
-    per_style = len(next(iter(glyph_map.values())))
-    total = per_style * styles
-    log(f"→ ✖️ Pre-scaling {per_style} glyphs ({styles} styles)...")
-
-    with tqdm(total=total, desc=" → 🔣 Scaling", unit="glyph",
-              ncols=80, leave=False, file=sys.stdout, disable=is_silent()) as progress:
-        for style_key in glyph_map:
-            for cp, tile in glyph_map[style_key].items():
-                progress.update(1)
-                pixels = tile.get("pixels")
-                if not pixels:
-                    tile["scaled"] = {"outer": [], "holes": []}
-                    continue
-
-                paths = pixels.get("paths", {})
-                holes = pixels.get("holes", {})
-
-                outer_paths = [p["corners"] for p in paths.values() if len(p.get("corners", [])) >= 3]
-                hole_paths = [h["corners"] for h in holes.values() if len(h.get("corners", [])) >= 3]
-
-                all_points = [pt for path in outer_paths + hole_paths for pt in path]
-                if not all_points:
-                    tile["scaled"] = {"outer": [], "holes": []}
-                    continue
-
-                min_x = min(x for x, y in all_points)
-                width, height = tile["size"]
-                scale_x = UNITS_PER_EM / width
-                scale_y = UNITS_PER_EM / height
-                descender_offset = height - 1
-
-                def transform(pt, _min_x=min_x, _sx=scale_x, _sy=scale_y, _do=descender_offset):
-                    x, y = pt
-                    return ((x - _min_x) * _sx, (_do - y) * _sy)
-
-                scaled_outer = [[transform(pt) for pt in path] for path in outer_paths]
-                scaled_holes = [[transform(pt) for pt in path] for path in hole_paths]
-
-                scaled_outer = _split_self_touching(scaled_outer)
-                scaled_holes = _split_self_touching(scaled_holes)
-                scaled_outer, scaled_holes = _inset_shared_vertices(scaled_outer, scaled_holes)
-
-                tile["scaled"] = {
-                    "outer": scaled_outer,
-                    "holes": scaled_holes
-                }
-
-def build_glyph_map(providers, unifont_glyphs):
-    """Builds a unified glyph map merging provider glyphs (priority) with unifont fallbacks."""
-    log(f"🧩 Building unified glyph map...")
-    glyph_map = {"Regular": OrderedDict(), "Bold": OrderedDict()}
-
-    # 1. Add provider glyphs (priority - added first)
-    for provider in providers:
-        for tile in provider["tiles"]:
-            cp = tile["codepoint"]
-            for style_key in ("Regular", "Bold"):
-                style = style_key.lower()
-                flat_tile = {
-                    "unicode": tile["unicode"],
-                    "codepoint": cp,
-                    "size": tile["size"],
-                    "ascent": tile["ascent"],
-                    "pixels": tile["pixels"][style],
-                    "svg": tile["svg"][style] if tile.get("svg") else None,
-                    "source": "provider"
-                }
-                glyph_map[style_key][cp] = flat_tile
-
-    provider_count = len(glyph_map["Regular"])
-    log(f"→ 🔣 {provider_count} provider glyphs (priority)")
-
-    # 2. Add unifont glyphs (fallback - skip if codepoint exists)
-    if unifont_glyphs:
-        log(f"→ 🔣 Processing unifont fallback glyphs...")
-        for style_key, bold in [("Regular", False), ("Bold", True)]:
-            unifont_tiles = convert_unifont_to_tiles(unifont_glyphs, bold)
-            for cp, tile in unifont_tiles.items():
-                if cp not in glyph_map[style_key]:
-                    glyph_map[style_key][cp] = tile
-
-    # 3. Sort by codepoint
-    for key in glyph_map:
-        glyph_map[key] = OrderedDict(sorted(glyph_map[key].items()))
-
-    # 4. Print summary
-    unifont_count = sum(1 for t in glyph_map["Regular"].values() if t["source"] == "unifont")
-    total = len(glyph_map["Regular"])
-    log(f"→ 🔢 Prepared {total} glyphs ({provider_count} provider, {unifont_count} unifont)")
-
-    # 5. Pre-compute scaling
-    precompute_glyph_scaling(glyph_map)
-
-    return glyph_map
-
-def clean_directories(output_dir=None):
-    """Removes and recreates the work/ and output/ directories."""
-    if output_dir is None:
-        output_dir = OUTPUT_DIR
-
-    log("🧹 Cleaning work directory...")
-    shutil.rmtree(WORK_DIR, ignore_errors=True)
-    os.makedirs(WORK_DIR, exist_ok=True)
-
-    log("🧹 Cleaning output directory...")
-    shutil.rmtree(output_dir, ignore_errors=True)
-    os.makedirs(output_dir, exist_ok=True)
