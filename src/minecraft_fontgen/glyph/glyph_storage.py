@@ -22,6 +22,10 @@ class GlyphStorage:
         else:
             self.glyf = font["glyf"]
 
+    def create_glyph(self, tile):
+        """Creates a new Glyph instance from tile data using this storage's font format."""
+        return Glyph(tile, self.use_cff)
+
     def add(self, glyph: Glyph):
         """Adds a drawn glyph to storage with its advance width, LSB, and cmap mappings."""
         name = glyph.name
@@ -31,7 +35,7 @@ class GlyphStorage:
         self.hmtx[name] = (advance_width, lsb)
 
         # Draw font glyph
-        font_glyph = glyph.get()
+        font_glyph = glyph.build()
         if self.use_cff:
             font_glyph.width = advance_width
             font_glyph.private = self.top_dict.Private
@@ -59,15 +63,7 @@ class GlyphStorage:
             "output": None
         }, self.use_cff))
 
-    def new_glyph(self, tile):
-        """Creates a new Glyph instance from tile data using this storage's font format."""
-        return Glyph(tile, self.use_cff)
-
-    def save(self, output_file):
-        """Saves the assembled font to an output file."""
-        self.font.save(output_file)
-
-    def write(self):
+    def finalize(self):
         """Finalizes the font by setting glyph order, charstrings/glyf entries, and metrics."""
         # Sort glyphs
         self.glyphs = OrderedDict([(NOTDEF, self.glyphs[NOTDEF])] + list(self.glyphs.items()))
@@ -97,3 +93,7 @@ class GlyphStorage:
 
         advances = [aw for (aw, _lsb) in self.hmtx.values() if aw is not None]
         self.font["OS/2"].xAvgCharWidth = int(round(sum(advances) / len(advances))) # Average character width (mean of the advanced widths)
+
+    def save(self, output_file):
+        """Saves the assembled font to an output file."""
+        self.font.save(output_file)
