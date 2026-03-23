@@ -26,8 +26,8 @@ class GlyphStorage:
         """Adds a drawn glyph to storage with its advance width, LSB, and cmap mappings."""
         name = glyph.name
         units_per_pixel = UNITS_PER_EM / glyph.size[0]
-        advance_width = UNITS_PER_EM // 2 if name in ("space", "uni0020") else int(round(glyph.advance * units_per_pixel))
-        lsb = int(round(glyph.lsb * units_per_pixel))
+        advance_width = UNITS_PER_EM // 2 if name in ("space", "uni0020") else int(round((glyph.width + 1) * units_per_pixel))
+        lsb = 0
         self.hmtx[name] = (advance_width, lsb)
 
         # Draw font glyph
