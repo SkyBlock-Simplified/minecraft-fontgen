@@ -9,10 +9,12 @@ project follows.
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
   - [Development Setup](#development-setup)
+  - [Installing FontForge](#installing-fontforge)
 - [Making Changes](#making-changes)
   - [Branching Strategy](#branching-strategy)
   - [Code Style](#code-style)
   - [Commit Messages](#commit-messages)
+  - [Validating Output](#validating-output)
 - [Submitting a Pull Request](#submitting-a-pull-request)
 - [Reporting Issues](#reporting-issues)
 - [Project Architecture](#project-architecture)
@@ -27,6 +29,7 @@ project follows.
 | Python | 3.14+ | Required for the `t-string` and other modern features used |
 | pip | Latest | Comes with Python |
 | Git | 2.x+ | For cloning and contributing |
+| [FontForge](https://fontforge.org/) | Latest | Required for font validation (`--validate`) |
 
 ### Development Setup
 
@@ -66,6 +69,53 @@ project follows.
    ```bash
    python -m minecraft_fontgen --help
    ```
+
+### Installing FontForge
+
+FontForge is used for font validation during development. It runs as a
+separate executable, not as a Python dependency - the `--validate` flag
+invokes `validate_font.py` through FontForge's own Python interpreter via
+subprocess.
+
+<details>
+<summary>Linux</summary>
+
+```bash
+# Debian / Ubuntu
+sudo apt install fontforge
+
+# Fedora
+sudo dnf install fontforge
+
+# Arch
+sudo pacman -S fontforge
+```
+
+</details>
+
+<details>
+<summary>macOS</summary>
+
+```bash
+brew install fontforge
+```
+
+</details>
+
+<details>
+<summary>Windows</summary>
+
+Download the installer from the [FontForge website](https://fontforge.org/en-US/downloads/)
+and ensure the installation directory is added to your `PATH`. By default this
+is `C:\Program Files (x86)\FontForgeBuilds\bin`.
+
+</details>
+
+After installation, confirm FontForge is on your `PATH`:
+
+```bash
+fontforge --version
+```
 
 ## Making Changes
 
@@ -110,6 +160,34 @@ without requiring an interactive terminal prompt.
 - Use the imperative mood ("Add", "Fix", "Update", not "Added", "Fixes").
 - Keep the subject line under 72 characters.
 - Add a body when the *why* isn't obvious from the subject.
+
+### Validating Output
+
+If your change touches glyph processing, contour tracing, or font table
+construction, validate the generated fonts with FontForge (see
+[Installing FontForge](#installing-fontforge)). The `--validate` flag runs
+FontForge's per-glyph validator on all generated font files after the build:
+
+```bash
+# Via CLI flag
+python -m minecraft_fontgen --version 1.21.4 --validate
+
+# Via environment variable (useful in IDE run configurations)
+FONTGEN_VALIDATE=1 python -m minecraft_fontgen --version 1.21.4
+```
+
+This reports errors grouped by type (wrong direction contours,
+self-intersections, missing extrema, etc.). A clean build produces
+`All N glyphs passed validation.` for each font file.
+
+You can also validate an existing font file directly:
+
+```bash
+fontforge -lang=py -script src/minecraft_fontgen/validate_font.py output/Minecraft-Regular.otf
+```
+
+When submitting changes that affect font output, include the validation results
+in your PR description to help reviewers verify correctness.
 
 ## Submitting a Pull Request
 
@@ -168,6 +246,7 @@ src/minecraft_fontgen/
 ├── file_io.py          # Bitmap slicing, contour tracing, glyph map building
 ├── font_creator.py     # Batch font file creation across all styles
 ├── functions.py        # Shared utilities (logging, HTTP, codepoint helpers)
+├── validate_font.py   # FontForge validation script (--validate)
 ├── glyph/
 │   ├── glyph.py        # Single glyph: scaling, shear transforms, pen drawing
 │   └── glyph_storage.py# Glyph accumulation, cmap management, final write
@@ -187,13 +266,14 @@ src/minecraft_fontgen/
 ### Pipeline flow
 
 ```
-parse_args() → clean_directories() → read_minecraft_piston_api()
-  → read_providers_from_file() → build_glyph_map() → create_font_files()
+parse_args() → clean_directories() → download_minecraft_assets()
+  → parse_provider_file() → build_glyph_map() → create_font_files()
+  → validate_fonts()  (optional, with --validate)
 ```
 
 If your change touches glyph processing (`file_io.py`, `glyph/`), test with
-both OpenType (`OPENTYPE = True`) and TrueType (`OPENTYPE = False`) output.
-If it touches table construction (`table/`), validate the output with FontForge.
+both OpenType (`--type opentype`) and TrueType (`--type truetype`) output,
+and run with `--validate` to catch contour winding and geometry issues.
 
 ## Legal
 
