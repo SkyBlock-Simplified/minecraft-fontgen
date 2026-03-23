@@ -60,70 +60,32 @@ class Glyph:
             draw_rect(NOTDEF_GLYPH[0], ccw=self.use_cff)
             draw_rect(NOTDEF_GLYPH[1], ccw=not self.use_cff)
 
-    def draw(self):
-        """Draws contours with winding based on geometric nesting depth."""
-        if not self.outer_scaled and not self.holes_scaled:
-            return
+    def _get_codepoint(self):
+        """Resolves the integer codepoint from the unicode character string."""
+        return get_unicode_codepoint(self.unicode)
 
-        all_contours = list(self.outer_scaled) + list(self.holes_scaled)
+    def _get_name(self):
+        """Returns the PostScript glyph name (uni0041 for BMP, u010000 for SMP)."""
+        if self.codepoint == 0x0000:
+            return NOTDEF
+        elif self.codepoint <= 0xFFFF:
+            return f"uni{self.codepoint:04X}"
+        else:
+            return f"u{self.codepoint:06X}"
 
-        for contour in all_contours:
-            if len(contour) < 3:
-                continue
-
-            ix, iy = self._interior_point(contour)
-            depth = sum(
-                1 for other in all_contours
-                if other is not contour and self._point_in_polygon(ix, iy, other)
-            )
-
-            # CFF: even depth = CCW, odd depth = CW
-            # TT: even depth = CW, odd depth = CCW
-            want_ccw = (depth % 2 == 0) == self.use_cff
-            sa = self._signed_area(contour)
-            is_ccw = sa > 0
-
-            pts = list(reversed(contour)) if want_ccw != is_ccw else contour
-            self.pen.moveTo(pts[0])
-            for pt in pts[1:]:
-                self.pen.lineTo(pt)
-            self.pen.closePath()
-
-    def get(self):
-        """Returns the finalized font glyph object (T2CharString for CFF, TTGlyph for TrueType)."""
+    def _new_pen(self):
+        """Creates a new fontTools drawing pen (T2CharStringPen for CFF, TTGlyphPen for TrueType)."""
         if self.use_cff:
-            glyph = self.pen.getCharString()
+            if self.codepoint == 0x0020:
+                advance_width = UNITS_PER_EM // 2
+            else:
+                units_per_pixel = UNITS_PER_EM / self.size[0]
+                advance_width = round((self.width + 1) * units_per_pixel)
+            return T2CharStringPen(advance_width, None)
         else:
-            glyph = self.pen.glyph()
+            return TTGlyphPen(None)
 
-        return glyph
-
-    def cpt(self):
-        """Returns True if this glyph is one of a set of debug-tracked codepoints."""
-        return self.codepoint in [0x0034, 0x0038, 0x0051, 0x0041, 0x00C0, 0x00CA]
-
-    def scale(self, italic=False):
-        """Assigns pre-computed scaled coordinates, applying italic shear if requested."""
-        if self.scaled is None:
-            return
-
-        outer = self.scaled.get("outer", [])
-        holes = self.scaled.get("holes", [])
-
-        if not outer and not holes:
-            return
-
-        if italic:
-            def apply_shear(pt):
-                sx, sy = pt
-                return (sx + sy * ITALIC_SHEAR_FACTOR, sy)
-            self.outer_scaled = [[apply_shear(pt) for pt in path] for path in outer]
-            self.holes_scaled = [[apply_shear(pt) for pt in path] for path in holes]
-        else:
-            self.outer_scaled = outer
-            self.holes_scaled = holes
-
-    def valid(self):
+    def is_valid(self):
         """Returns True if this glyph has a valid, non-null, non-.notdef codepoint."""
         if self.codepoint is None:
             print(f" → ⚠️ Skipping invalid unicode '0x{self.codepoint:04X}'.", file=sys.stderr)
@@ -187,30 +149,55 @@ class Glyph:
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(svg_header + "\n" + "\n".join(svg_paths) + "\n" + svg_footer)
 
-    def _get_codepoint(self):
-        """Resolves the integer codepoint from the unicode character string."""
-        return get_unicode_codepoint(self.unicode)
+    def scale(self, italic=False):
+        """Assigns pre-computed scaled coordinates, applying italic shear if requested."""
+        if self.scaled is None:
+            return
 
-    def _get_name(self):
-        """Returns the PostScript glyph name (uni0041 for BMP, u010000 for SMP)."""
-        if self.codepoint == 0x0000:
-            return NOTDEF
-        elif self.codepoint <= 0xFFFF:
-            return f"uni{self.codepoint:04X}"
-        else:
-            return f"u{self.codepoint:06X}"
+        outer = self.scaled.get("outer", [])
+        holes = self.scaled.get("holes", [])
 
-    def _new_pen(self):
-        """Creates a new fontTools drawing pen (T2CharStringPen for CFF, TTGlyphPen for TrueType)."""
-        if self.use_cff:
-            if self.codepoint == 0x0020:
-                advance_width = UNITS_PER_EM // 2
-            else:
-                units_per_pixel = UNITS_PER_EM / self.size[0]
-                advance_width = round((self.width + 1) * units_per_pixel)
-            return T2CharStringPen(advance_width, None)
+        if not outer and not holes:
+            return
+
+        if italic:
+            def apply_shear(pt):
+                sx, sy = pt
+                return (sx + sy * ITALIC_SHEAR_FACTOR, sy)
+            self.outer_scaled = [[apply_shear(pt) for pt in path] for path in outer]
+            self.holes_scaled = [[apply_shear(pt) for pt in path] for path in holes]
         else:
-            return TTGlyphPen(None)
+            self.outer_scaled = outer
+            self.holes_scaled = holes
+
+    def draw(self):
+        """Draws contours with winding based on geometric nesting depth."""
+        if not self.outer_scaled and not self.holes_scaled:
+            return
+
+        all_contours = list(self.outer_scaled) + list(self.holes_scaled)
+
+        for contour in all_contours:
+            if len(contour) < 3:
+                continue
+
+            ix, iy = self._interior_point(contour)
+            depth = sum(
+                1 for other in all_contours
+                if other is not contour and self._point_in_polygon(ix, iy, other)
+            )
+
+            # CFF: even depth = CCW, odd depth = CW
+            # TT: even depth = CW, odd depth = CCW
+            want_ccw = (depth % 2 == 0) == self.use_cff
+            sa = self._signed_area(contour)
+            is_ccw = sa > 0
+
+            pts = list(reversed(contour)) if want_ccw != is_ccw else contour
+            self.pen.moveTo(pts[0])
+            for pt in pts[1:]:
+                self.pen.lineTo(pt)
+            self.pen.closePath()
 
     @staticmethod
     def _interior_point(contour):
@@ -282,3 +269,16 @@ class Glyph:
                 inside = not inside
             j = i
         return inside
+
+    def build(self):
+        """Returns the finalized font glyph object (T2CharString for CFF, TTGlyph for TrueType)."""
+        if self.use_cff:
+            glyph = self.pen.getCharString()
+        else:
+            glyph = self.pen.glyph()
+
+        return glyph
+
+    def is_debug_codepoint(self):
+        """Returns True if this glyph is one of a set of debug-tracked codepoints."""
+        return self.codepoint in [0x0034, 0x0038, 0x0051, 0x0041, 0x00C0, 0x00CA]
