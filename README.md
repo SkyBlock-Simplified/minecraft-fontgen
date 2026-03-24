@@ -468,20 +468,20 @@ Each bitmap glyph goes through:
 minecraft-fontgen/
 ├── src/minecraft_fontgen/
 │   ├── __init__.py
-│   ├── __main__.py          # python -m entry point
-│   ├── main.py              # Pipeline orchestration
-│   ├── cli.py               # Argument parsing, env var resolution
-│   ├── config.py            # Constants and runtime configuration
-│   ├── piston.py            # Mojang Piston API, JAR/unifont downloads
-│   ├── file_io.py           # Bitmap slicing, contour tracing, glyph maps
-│   ├── font_creator.py      # Batch font file creation
-│   ├── functions.py         # Shared utilities (logging, HTTP, codepoints)
-│   ├── validate_font.py    # FontForge validation script (--validate)
+│   ├── __main__.py                # python -m entry point
+│   ├── main.py                    # Pipeline orchestration
+│   ├── cli.py                     # Argument parsing, env var resolution
+│   ├── config.py                  # Constants and runtime configuration
+│   ├── piston.py                  # Mojang Piston API, JAR/unifont downloads
+│   ├── file_io.py                 # Bitmap slicing, contour tracing, glyph maps
+│   ├── font_creator.py            # Batch font file creation
+│   ├── functions.py               # Shared utilities (logging, HTTP, codepoints)
+│   ├── validate_font.py           # FontForge validation script (--validate)
 │   ├── glyph/
-│   │   ├── glyph.py         # Glyph scaling, transforms, pen drawing
-│   │   └── glyph_storage.py # Glyph accumulation, cmap, final output
-│   └── table/               # One file per OpenType/TrueType table
-│       ├── header.py         # head
+│   │   ├── glyph.py               # Glyph scaling, transforms, pen drawing
+│   │   └── glyph_storage.py       # Glyph accumulation, cmap, final output
+│   └── table/                     # One file per OpenType/TrueType table
+│       ├── header.py              # head
 │       ├── horizontal_header.py   # hhea
 │       ├── horizontal_metrics.py  # hmtx
 │       ├── maximum_profile.py     # maxp
