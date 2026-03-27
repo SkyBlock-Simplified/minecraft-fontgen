@@ -1,5 +1,6 @@
 # noinspection PyUnresolvedReferences
 import fontforge
+import os
 import sys
 from collections import defaultdict
 
@@ -34,9 +35,7 @@ GLYPH_ERRORS = {
 MAX_SAMPLES = 8
 
 for font_path in sys.argv[1:]:
-    print(f"{'=' * 60}")
-    print(f" {font_path}")
-    print(f"{'=' * 60}")
+    filename = os.path.basename(font_path)
     font = fontforge.open(font_path)
 
     total_glyphs = 0
@@ -56,18 +55,15 @@ for font_path in sys.argv[1:]:
     bad_count = total_glyphs - clean_glyphs
 
     if bad_count == 0:
-        print(f" All {total_glyphs} glyphs passed validation.")
+        print(f" → ✅ {filename} — {total_glyphs} glyphs passed")
     else:
-        print(f" {clean_glyphs}/{total_glyphs} glyphs clean, {bad_count} with issues:")
-        print()
+        print(f" → ⚠️ {filename} — {clean_glyphs}/{total_glyphs} clean, {bad_count} with issues:")
         for code in sorted(error_buckets.keys()):
             names = error_buckets[code]
             desc = GLYPH_ERRORS.get(code, f"Unknown (0x{code:X})")
             sample = ", ".join(names[:MAX_SAMPLES])
             suffix = f" ... +{len(names) - MAX_SAMPLES} more" if len(names) > MAX_SAMPLES else ""
-            print(f"  0x{code:05X} {desc}")
-            print(f"          {len(names)} glyphs: {sample}{suffix}")
-            print()
+            print(f"      0x{code:05X} {desc}")
+            print(f"              {len(names)} glyphs: {sample}{suffix}")
 
-    print()
     font.close()
