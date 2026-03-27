@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from math import ceil
 
 from minecraft_fontgen.glyph.glyph import Glyph
 from minecraft_fontgen.config import NOTDEF, DEFAULT_GLYPH_SIZE, UNITS_PER_EM
@@ -14,6 +15,8 @@ class GlyphStorage:
         self.glyphs = OrderedDict()
         self.cpr = [0xFFFFFF, 0]
         self.hmtx = {}
+        self.y_min = 0
+        self.y_max = 0
 
         if self.use_cff:
             cff = font["CFF "]
@@ -32,12 +35,29 @@ class GlyphStorage:
         units_per_pixel = UNITS_PER_EM / glyph.size[0]
         advance_width = UNITS_PER_EM // 2 if name in ("space", "uni0020") else int(round((glyph.width + 1) * units_per_pixel))
         lsb = 0
+
+        # Adjust metrics from actual glyph extents (italic shear may widen glyphs)
+        all_contours = list(glyph.outer_scaled) + list(glyph.holes_scaled)
+        if all_contours:
+            all_points = [pt for contour in all_contours for pt in contour]
+            x_max = max(x for x, y in all_points)
+            y_max = max(y for x, y in all_points)
+            y_min = min(y for x, y in all_points)
+
+            if x_max > advance_width:
+                advance_width = ceil(x_max)
+
+            self.y_max = max(self.y_max, y_max)
+            self.y_min = min(self.y_min, y_min)
+
         self.hmtx[name] = (advance_width, lsb)
 
         # Draw font glyph
         font_glyph = glyph.build()
         if self.use_cff:
             font_glyph.width = advance_width
+            if font_glyph.program and isinstance(font_glyph.program[0], (int, float)):
+                font_glyph.program[0] = advance_width
             font_glyph.private = self.top_dict.Private
         self.glyphs[name] = font_glyph
 
@@ -93,6 +113,16 @@ class GlyphStorage:
 
         advances = [aw for (aw, _lsb) in self.hmtx.values() if aw is not None]
         self.font["OS/2"].xAvgCharWidth = int(round(sum(advances) / len(advances))) # Average character width (mean of the advanced widths)
+
+        # Update vertical metrics to encompass all glyph extents
+        y_max = ceil(self.y_max)
+        y_min_abs = ceil(abs(self.y_min))
+        if y_max > self.font["hhea"].ascent:
+            self.font["hhea"].ascent = y_max
+            self.font["OS/2"].usWinAscent = y_max
+        if y_min_abs > self.font["OS/2"].usWinDescent:
+            self.font["hhea"].descent = -y_min_abs
+            self.font["OS/2"].usWinDescent = y_min_abs
 
     def save(self, output_file):
         """Saves the assembled font to an output file."""
