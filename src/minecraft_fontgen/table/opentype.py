@@ -1,7 +1,7 @@
 from fontTools.ttLib import newTable
 from fontTools.cffLib import (
     CFFFontSet, TopDict, TopDictIndex, Index,
-    PrivateDict, FontDict, FDSelect, CharStrings
+    PrivateDict, CharStrings
 )
 
 from minecraft_fontgen.config import OUTPUT_FONT_NAME, BOUNDING_BOX, UNITS_PER_EM
@@ -31,18 +31,14 @@ def create_ot_font_tables(font, bold = False, italic = False):
     top_dict.FontMatrix = [1 / UNITS_PER_EM, 0, 0, 1 / UNITS_PER_EM, 0, 0]
 
     # Rebuild CharStrings
-    private = PrivateDict(None, None, 0)
-    private.Subrs = Index()
-    fd_array = [FontDict()]
-    fd_array[0].Private = private
-    fd_select = FDSelect()
+    private = PrivateDict()
     charstrings = CharStrings(
         None,
-        top_dict,
+        None,
         cff_font_set.GlobalSubrs,
         private,
-        fd_select,
-        fd_array
+        None,
+        None
     )
     top_dict.Private = private
     top_dict.CharStrings = charstrings
