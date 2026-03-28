@@ -12,6 +12,7 @@ Convert Minecraft's bitmap font glyphs into fully functional OpenType (`.otf`) o
   - [Prerequisites](#prerequisites)
   - [Installation](#installation)
   - [Usage](#usage)
+  - [IntelliJ IDEA](#intellij-idea)
   - [CLI Arguments](#cli-arguments)
   - [Environment Variables](#environment-variables)
 - [Output](#output)
@@ -123,6 +124,32 @@ FONTGEN_VERSION=1.21.4 python -m minecraft_fontgen
 # Combine multiple options
 python -m minecraft_fontgen --version 1.21.4 --styles regular,bold --output dist/fonts --silent
 ```
+
+### IntelliJ IDEA
+
+The repository includes a shared run configuration for
+[IntelliJ IDEA](https://www.jetbrains.com/idea/) and
+[PyCharm](https://www.jetbrains.com/pycharm/). After opening the project, the
+**main** configuration appears automatically in the **Run/Debug** toolbar.
+
+To run or debug:
+
+1. Open the project in IntelliJ IDEA or PyCharm.
+2. Select **main** from the run configuration dropdown in the toolbar.
+3. Click **Run** (▶) or **Debug** (🪲) to start the tool.
+
+The configuration runs `python -m minecraft_fontgen` using the project's
+Python 3.14 virtual environment with these environment variables pre-set:
+
+| Variable | Value | Purpose |
+|----------|-------|---------|
+| `FONTGEN_VALIDATE` | `1` | Runs FontForge validation after build |
+| `PYTHONUNBUFFERED` | `1` | Ensures real-time console output |
+
+To pass additional arguments (e.g. `--version 1.21.4`), open the configuration
+editor (**Run > Edit Configurations**) and add them to the **Parameters** field.
+You can also add or override environment variables in the **Environment
+variables** section of the same dialog.
 
 ### CLI Arguments
 
