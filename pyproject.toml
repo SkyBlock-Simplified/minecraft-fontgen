@@ -32,6 +32,3 @@ minecraft-fontgen = "minecraft_fontgen.main:main"
 
 [tool.setuptools.dynamic]
 version = { attr = "minecraft_fontgen.config.VERSION" }
-
-[tool.setuptools.packages.find]
-where = ["src"]
