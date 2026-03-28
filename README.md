@@ -252,7 +252,7 @@ output/
 
 The file extension is `.otf` for OpenType (CFF) or `.ttf` for TrueType,
 controlled by `--type` / `FONTGEN_TYPE` (or the `OPENTYPE` constant in
-[`config.py`](src/minecraft_fontgen/config.py)).
+[`config.py`](minecraft_fontgen/config.py)).
 
 ## Unicode Coverage
 
@@ -264,7 +264,7 @@ optionally from [GNU Unifont](https://unifoundry.com/unifont/) as a fallback.
 > of the ranges below. These ranges control which additional glyphs are pulled
 > from GNU Unifont (1.13+) and which codepoints are included from
 > `glyph_sizes.bin` (1.12.2 and earlier). To customize coverage, edit
-> `UNIFONT_RANGES` in [`config.py`](src/minecraft_fontgen/config.py).
+> `UNIFONT_RANGES` in [`config.py`](minecraft_fontgen/config.py).
 
 <details>
 <summary>Unicode block coverage (<code>UNIFONT_RANGES</code>)</summary>
@@ -487,7 +487,7 @@ Each bitmap glyph goes through:
 
 ```
 minecraft-fontgen/
-├── src/minecraft_fontgen/
+├── minecraft_fontgen/
 │   ├── __init__.py
 │   ├── __main__.py                # python -m entry point
 │   ├── main.py                    # Pipeline orchestration

@@ -183,7 +183,7 @@ self-intersections, missing extrema, etc.). A clean build produces
 You can also validate an existing font file directly:
 
 ```bash
-fontforge -lang=py -script src/minecraft_fontgen/validate_font.py output/Minecraft-Regular.otf
+fontforge -lang=py -script minecraft_fontgen/validate_font.py output/Minecraft-Regular.otf
 ```
 
 When submitting changes that affect font output, include the validation results
@@ -238,7 +238,7 @@ When reporting a bug, include:
 A brief overview to help you find your way around the codebase:
 
 ```
-src/minecraft_fontgen/
+minecraft_fontgen/
 ├── main.py             # Pipeline entry point (clean → download → parse → build → create)
 ├── cli.py              # Argument parsing and env var resolution
 ├── config.py           # All constants and runtime configuration
