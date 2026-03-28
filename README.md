@@ -76,16 +76,10 @@ python -m venv .venv
 
 </details>
 
-Install in **editable mode** (recommended for development):
+Install the package and its dependencies:
 
 ```bash
 pip install -e .
-```
-
-Or install dependencies directly:
-
-```bash
-pip install -r requirements.txt
 ```
 
 ### Usage
@@ -519,7 +513,6 @@ minecraft-fontgen/
 │       ├── opentype.py            # CFF tables
 │       └── truetype.py            # glyf/loca tables
 ├── pyproject.toml
-├── requirements.txt
 ├── LICENSE.md
 ├── COPYRIGHT.md
 ├── CONTRIBUTING.md

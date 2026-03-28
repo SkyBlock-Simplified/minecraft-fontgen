@@ -13,9 +13,6 @@ Minecraft-FontGen converts Minecraft's bitmap font glyphs into OpenType (CFF) or
 .venv/Scripts/activate    # Windows
 
 # Install dependencies
-pip install -r requirements.txt
-
-# Install in editable mode (recommended)
 pip install -e .
 
 # Run the tool (interactive - prompts for Minecraft version)
