@@ -20,7 +20,7 @@ dependencies = [
     "svgpathtools>=1.6",
     "uharfbuzz>=0.40",
     "tqdm>=4.67",
-    "requests>=2.31",
+    "requests>=2.33",
 ]
 
 [project.scripts]
