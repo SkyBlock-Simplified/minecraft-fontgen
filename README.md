@@ -13,8 +13,7 @@ Convert Minecraft's bitmap font glyphs into fully functional OpenType (`.otf`) o
   - [Installation](#installation)
   - [Usage](#usage)
   - [IntelliJ IDEA](#intellij-idea)
-  - [CLI Arguments](#cli-arguments)
-  - [Environment Variables](#environment-variables)
+  - [Configuration](#configuration)
 - [Output](#output)
 - [Unicode Coverage](#unicode-coverage)
 - [Docker Compose](#docker-compose)
@@ -145,21 +144,26 @@ editor (**Run > Edit Configurations**) and add them to the **Parameters** field.
 You can also add or override environment variables in the **Environment
 variables** section of the same dialog.
 
-### CLI Arguments
+### Configuration
 
-All arguments are optional. When omitted, values fall back to environment
-variables, then to `.env` file values, then to built-in defaults.
+All options are optional. Values are resolved in this order (highest priority
+first):
 
-| Argument | Description | Default |
-|----------|-------------|---------|
-| `--version <version>` | Minecraft version to compile (skips interactive prompt) | Interactive prompt |
-| `--output <path>` | Directory for generated font files | `output` |
-| `--styles <list>` | Comma-separated font styles to generate | All enabled in `config.py` |
-| `--type <type>` | Font type: `opentype`/`otf` or `truetype`/`ttf` | `opentype` |
-| `--silent` | Suppress all output except errors | Disabled |
-| `--validate` | Run FontForge validation after build (requires `fontforge`) | Disabled |
+```
+CLI argument  >  Shell environment variable  >  .env file  >  config.py defaults
+```
 
-**Styles** accepts any combination of: `regular`, `bold`, `italic`, `bolditalic`, `galactic`, `illageralt`.
+| CLI | Env Var | Description | Default | Example |
+|-----|---------|-------------|---------|---------|
+| `--version` | `FONTGEN_VERSION` | Minecraft version to compile (skips interactive prompt) | Interactive prompt | `1.21.4` |
+| `--output` | `FONTGEN_OUTPUT` | Directory for generated font files | `output` | `dist/fonts` |
+| `--styles` | `FONTGEN_STYLES` | Comma-separated font styles to generate | All enabled in `config.py` | `regular,bold` |
+| `--type` | `FONTGEN_TYPE` | Font type: `opentype`/`otf` or `truetype`/`ttf` | `opentype` | `opentype` |
+| `--silent` | `FONTGEN_SILENT` | Suppress all output except errors | Disabled | `true` |
+| `--validate` | `FONTGEN_VALIDATE` | Run FontForge validation after build (requires `fontforge`) | Disabled | `true` |
+
+Boolean flags accept `1`, `true`, or `yes`. Valid styles: `regular`, `bold`,
+`italic`, `bolditalic`, `galactic`, `illageralt`.
 
 ```bash
 # Only generate Regular and Bold
@@ -170,6 +174,9 @@ python -m minecraft_fontgen --output build/fonts
 
 # Silent mode for scripts
 python -m minecraft_fontgen --silent --version 1.21.4
+
+# Using environment variables
+FONTGEN_VERSION=1.21.4 FONTGEN_STYLES=regular,bold python -m minecraft_fontgen
 ```
 
 > [!NOTE]
@@ -177,30 +184,8 @@ python -m minecraft_fontgen --silent --version 1.21.4
 > is only produced when both `bold` and `italic` are present *or* `bolditalic`
 > is explicitly listed.
 
-### Environment Variables
-
-Every CLI argument has a corresponding environment variable. These are useful
-for Docker, CI/CD, or when you want to set defaults without passing flags
-every time.
-
-| Variable | Description | Equivalent CLI | Example |
-|----------|-------------|----------------|---------|
-| `FONTGEN_VERSION` | Minecraft version to compile | `--version` | `1.21.4` |
-| `FONTGEN_OUTPUT` | Output directory path | `--output` | `dist/fonts` |
-| `FONTGEN_STYLES` | Comma-separated font styles | `--styles` | `regular,bold` |
-| `FONTGEN_TYPE` | Font type: `opentype`/`otf` or `truetype`/`ttf` | `--type` | `opentype` |
-| `FONTGEN_SILENT` | Suppress output (`1`, `true`, or `yes`) | `--silent` | `true` |
-| `FONTGEN_VALIDATE` | Run FontForge validation after build (`1`, `true`, or `yes`) | `--validate` | `false` |
-
-```bash
-export FONTGEN_VERSION=1.21.4
-export FONTGEN_STYLES=regular,bold
-export FONTGEN_SILENT=true
-python -m minecraft_fontgen
-```
-
 <details>
-<summary>The <code>.env</code> file and configuration priority</summary>
+<summary>The <code>.env</code> file</summary>
 
 You can create a `.env` file in the project root to set defaults without
 modifying your shell environment. The file is loaded automatically at startup.
@@ -216,17 +201,9 @@ FONTGEN_VALIDATE=false
 ```
 
 Values from `.env` will **not** overwrite variables that already exist in your
-shell environment.
-
-Configuration values are resolved in this order (highest priority first):
-
-```
-CLI argument  >  Shell environment variable  >  .env file  >  config.py defaults
-```
-
-For example, if `FONTGEN_OUTPUT=dist` is in your `.env` but you run
-`python -m minecraft_fontgen --output build`, the output directory will be
-`build`.
+shell environment. For example, if `FONTGEN_OUTPUT=dist` is in your `.env` but
+you run `python -m minecraft_fontgen --output build`, the output directory will
+be `build`.
 
 </details>
 
