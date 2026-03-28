@@ -43,7 +43,7 @@ Convert Minecraft's bitmap font glyphs into fully functional OpenType (`.otf`) o
 
 | Requirement | Version | Notes |
 |-------------|---------|-------|
-| [Python](https://www.python.org/downloads/) | **3.14+** | Required |
+| [Python](https://www.python.org/downloads/) | **3.10+** | Required |
 | pip | Latest | Included with Python |
 | [Git](https://git-scm.com/) | 2.x+ | For cloning the repository |
 
@@ -60,7 +60,7 @@ cd minecraft-fontgen
 <summary>Linux / macOS</summary>
 
 ```bash
-python3.14 -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 ```
 
@@ -133,7 +133,7 @@ To run or debug:
 3. Click **Run** (▶) or **Debug** (🪲) to start the tool.
 
 The configuration runs `python -m minecraft_fontgen` using the project's
-Python 3.14 virtual environment with these environment variables pre-set:
+Python virtual environment with these environment variables pre-set:
 
 | Variable | Value | Purpose |
 |----------|-------|---------|
@@ -340,7 +340,7 @@ Add this service to your project's `docker-compose.yml`:
 ```yaml
 services:
   fontgen:
-    image: python:3.14-slim
+    image: python:3-slim
     user: "1000:1000"
     working_dir: /build
     environment:
@@ -373,7 +373,7 @@ volumes:
 ```yaml
 services:
   fontgen:
-    image: python:3.14-slim
+    image: python:3-slim
     user: "1000:1000"
     working_dir: /build
     environment:

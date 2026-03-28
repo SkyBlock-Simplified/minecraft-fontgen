@@ -26,7 +26,7 @@ project follows.
 
 | Requirement | Version | Notes |
 |-------------|---------|-------|
-| Python | 3.14+ | Required for the `t-string` and other modern features used |
+| Python | 3.10+ | Required |
 | pip | Latest | Comes with Python |
 | Git | 2.x+ | For cloning and contributing |
 | [FontForge](https://fontforge.org/) | Latest | Required for font validation (`--validate`) |
@@ -47,7 +47,7 @@ project follows.
 
    ```bash
    # Linux / macOS
-   python3.14 -m venv .venv
+   python3 -m venv .venv
    source .venv/bin/activate
 
    # Windows

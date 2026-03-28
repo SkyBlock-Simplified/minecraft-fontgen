@@ -129,7 +129,7 @@ When `UNIFONT = True`, GNU Unifont hex files are downloaded from Minecraft's ass
 
 ## Dependencies
 
-fontTools (font building), Pillow (bitmap processing), numpy (pixel grid operations), requests (Mojang API downloads), tqdm (progress bars), svgpathtools/uharfbuzz (SVG utilities). Python 3.14+.
+fontTools (font building), Pillow (bitmap processing), numpy (pixel grid operations), requests (Mojang API downloads), tqdm (progress bars), svgpathtools/uharfbuzz (SVG utilities). Python 3.10+.
 
 ## Module Import Style
 
