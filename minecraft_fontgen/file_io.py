@@ -633,6 +633,11 @@ def _process_alternate_font(alt_config, regular_map):
         bitmap_grid = (bitmap_grid < 128).astype(np.uint8)
         pixel_data = _trace_bitmap_contours(bitmap_grid, bold=False)
 
+        # Match advance width to Regular glyph to preserve text layout
+        if codepoint in regular_map:
+            regular_width = regular_map[codepoint].get("pixels", {}).get("width", pixel_data["width"])
+            pixel_data["width"] = max(pixel_data["width"], regular_width)
+
         tile = {
             "unicode": unicode_char,
             "codepoint": codepoint,
