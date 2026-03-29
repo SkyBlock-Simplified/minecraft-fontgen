@@ -55,15 +55,15 @@ for font_path in sys.argv[1:]:
     bad_count = total_glyphs - clean_glyphs
 
     if bad_count == 0:
-        print(f" → ✅ {filename} — {total_glyphs} glyphs passed")
+        print(f"→ ✅ {filename} — {total_glyphs} glyphs passed")
     else:
-        print(f" → ⚠️ {filename} — {clean_glyphs}/{total_glyphs} clean, {bad_count} with issues:")
+        print(f"→ ⚠️ {filename} — {clean_glyphs}/{total_glyphs} clean, {bad_count} with issues:")
         for code in sorted(error_buckets.keys()):
             names = error_buckets[code]
             desc = GLYPH_ERRORS.get(code, f"Unknown (0x{code:X})")
             sample = ", ".join(names[:MAX_SAMPLES])
-            suffix = f" ... +{len(names) - MAX_SAMPLES} more" if len(names) > MAX_SAMPLES else ""
-            print(f"      0x{code:05X} {desc}")
-            print(f"              {len(names)} glyphs: {sample}{suffix}")
+            suffix = f"... +{len(names) - MAX_SAMPLES} more" if len(names) > MAX_SAMPLES else ""
+            print(f"     0x{code:05X} {desc}")
+            print(f"             {len(names)} glyphs: {sample}{suffix}")
 
     font.close()

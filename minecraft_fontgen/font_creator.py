@@ -58,7 +58,7 @@ def create_font_files(glyph_map, use_cff, output_fonts, output_dir, output_font_
 
     # Convert glyphs for all styles in a single pass
     total = sum(len(glyph_map[f["pixel_style"]]) for f in available_fonts)
-    log(f"→ 🔣 Converting glyphs ({len(available_fonts)} styles)...")
+    log(f"→ 🔣 Drawing glyphs ({len(available_fonts)} styles)...")
 
     with tqdm(total=total, desc=f" → 🔣 {available_fonts[0]['name']}", unit="glyph",
               ncols=80, leave=False, file=sys.stdout, disable=is_silent()) as progress:
@@ -82,7 +82,7 @@ def create_font_files(glyph_map, use_cff, output_fonts, output_dir, output_font_
                 storage.add(glyph)
 
     # Finalize and save all fonts
-    log(f"→ 💾 Saving font files...", flush=True)
+    log(f"💾 Saving font files...", flush=True)
     output_files = []
     for font_name, (storage, style) in storages.items():
         if style["pixel_style"] not in glyph_map:
@@ -90,7 +90,7 @@ def create_font_files(glyph_map, use_cff, output_fonts, output_dir, output_font_
 
         output_file = f"{output_font_name}-{font_name}.{output_file_ext}"
         output_path = f"{output_dir}/{output_file}"
-        log(f" → ☕ {output_file}...", flush=True)
+        log(f"→ ☕ {output_file}...", flush=True)
         storage.add_notdef()
         storage.finalize()
         storage.save(output_path)
