@@ -28,7 +28,7 @@ python -m minecraft_fontgen --version 1.21.4 --validate
 FONTGEN_VALIDATE=1 python -m minecraft_fontgen --version 1.21.4
 
 # Validate an existing font file directly
-fontforge -lang=py -script src/minecraft_fontgen/validate_font.py output/Minecraft-Regular.otf
+fontforge -lang=py -script minecraft_fontgen/validate_font.py output/Minecraft-Regular.otf
 ```
 
 There are no tests or linting configured.
@@ -48,7 +48,7 @@ There are no tests or linting configured.
 
 ## Architecture
 
-### Pipeline (src/minecraft_fontgen/main.py)
+### Pipeline (minecraft_fontgen/main.py)
 
 The pipeline runs sequentially through six stages:
 
@@ -66,7 +66,7 @@ The pipeline runs sequentially through six stages:
 - `minecraft_fontgen.glyph.glyph:Glyph` - Assigns pre-computed scaled coordinates, applies italic shear transform if needed, draws contours with winding direction based on geometric nesting depth via fontTools pen (T2CharStringPen for CFF, TTGlyphPen for TrueType)
 - `minecraft_fontgen.glyph.glyph_storage:GlyphStorage` - Accumulates glyphs, manages cmap table entries (Format 4 for BMP, Format 12 for SMP), writes final glyph order and metrics
 
-### Font Table Modules (src/minecraft_fontgen/table/)
+### Font Table Modules (minecraft_fontgen/table/)
 
 Each file creates one OpenType/TrueType table via `fontTools.ttLib.newTable()`. They set initial values; `GlyphStorage.finalize()` patches final glyph-dependent values (numGlyphs, charIndex ranges, average widths, etc.) after all glyphs are added.
 
@@ -81,7 +81,7 @@ Each file creates one OpenType/TrueType table via `fontTools.ttLib.newTable()`. 
 - `opentype.py` - CFF tables (font set, top dict, charstrings)
 - `truetype.py` - TrueType tables (glyf, loca)
 
-### Key Constants (src/minecraft_fontgen/config.py)
+### Key Constants (minecraft_fontgen/config.py)
 
 Configuration is module-level constants, not CLI args (unless noted). Key settings:
 - `OPENTYPE = True` - CFF (OpenType) vs TrueType outlines (overridable via `--type`/`FONTGEN_TYPE`)
@@ -124,8 +124,8 @@ When `UNIFONT = True`, GNU Unifont hex files are downloaded from Minecraft's ass
 
 - `work/` - Downloaded JAR, extracted assets, sliced tile bitmaps + debug SVGs (gitignored)
 - `output/` - Generated `.otf`/`.ttf` files (gitignored)
-- `src/font/` - Reference copies of Minecraft's font provider JSONs
-- `src/minecraft_fontgen/validate_font.py` - FontForge validation script (run via `fontforge -lang=py -script` subprocess, not imported as a module)
+- `font/` - Reference copies of Minecraft's font provider JSONs
+- `minecraft_fontgen/validate_font.py` - FontForge validation script (run via `fontforge -lang=py -script` subprocess, not imported as a module)
 
 ## Dependencies
 
