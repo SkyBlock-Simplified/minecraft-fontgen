@@ -6,7 +6,7 @@ import numpy as np
 from collections import deque, OrderedDict
 from tqdm import tqdm
 from PIL import Image
-from minecraft_fontgen.config import COLUMNS_PER_ROW, DEFAULT_GLYPH_SIZE, OUTPUT_DIR, MINECRAFT_JAR_DIR, WORK_DIR, UNITS_PER_EM, TEXTURE_PATH, FONT_STYLES
+from minecraft_fontgen.config import ASCENT, COLUMNS_PER_ROW, DEFAULT_GLYPH_SIZE, OUTPUT_DIR, MINECRAFT_JAR_DIR, WORK_DIR, UNITS_PER_EM, TEXTURE_PATH, FONT_STYLES
 from minecraft_fontgen.functions import get_unicode_codepoint, in_unifont_ranges, log, is_silent, parse_json
 
 
@@ -701,9 +701,8 @@ def precompute_glyph_scaling(glyph_map):
 
                 min_x = min(x for x, y in all_points)
                 width, height = tile["size"]
-                ascent = tile["ascent"]
                 scale = UNITS_PER_EM / height
-                descender_offset = ascent
+                descender_offset = ASCENT / scale
 
                 def transform(pt, _min_x=min_x, _s=scale, _do=descender_offset):
                     x, y = pt
