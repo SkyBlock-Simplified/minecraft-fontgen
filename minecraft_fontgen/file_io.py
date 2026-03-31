@@ -702,7 +702,7 @@ def precompute_glyph_scaling(glyph_map):
                 min_x = min(x for x, y in all_points)
                 width, height = tile["size"]
                 ascent = tile["ascent"]
-                scale = UNITS_PER_EM / DEFAULT_GLYPH_SIZE
+                scale = UNITS_PER_EM / height
                 descender_offset = ascent
 
                 def transform(pt, _min_x=min_x, _s=scale, _do=descender_offset):

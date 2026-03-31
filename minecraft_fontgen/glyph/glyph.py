@@ -79,7 +79,7 @@ class Glyph:
             if self.codepoint == 0x0020:
                 advance_width = UNITS_PER_EM // 2
             else:
-                units_per_pixel = UNITS_PER_EM / DEFAULT_GLYPH_SIZE
+                units_per_pixel = UNITS_PER_EM / self.size[1]
                 advance_width = round((self.width + 1) * units_per_pixel)
             return T2CharStringPen(advance_width, None)
         else:
