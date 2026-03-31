@@ -32,8 +32,7 @@ class GlyphStorage:
     def add(self, glyph: Glyph):
         """Adds a drawn glyph to storage with its advance width, LSB, and cmap mappings."""
         name = glyph.name
-        units_per_pixel = UNITS_PER_EM / glyph.size[1]
-        advance_width = UNITS_PER_EM // 2 if name in ("space", "uni0020") else int(round((glyph.width + 1) * units_per_pixel))
+        advance_width = UNITS_PER_EM // 2 if name in ("space", "uni0020") else int(round((glyph.width + 1) * glyph.units_per_pixel))
         lsb = 0
 
         # Adjust metrics from actual glyph extents (italic shear may widen glyphs)

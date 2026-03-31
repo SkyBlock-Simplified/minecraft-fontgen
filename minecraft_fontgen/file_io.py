@@ -683,6 +683,21 @@ def precompute_glyph_scaling(glyph_map):
         for style_key in glyph_map:
             for cp, tile in glyph_map[style_key].items():
                 progress.update(1)
+
+                # Compute scale factor.
+                # Provider tiles: UNITS_PER_EM / height maps full grid to 1em (all providers
+                # share descent=-128 regardless of their ascent/height ratio).
+                # Unifont tiles: ASCENT / ascent maps ascent rows to ASCENT (896),
+                # making ink dimensions match provider equivalents (e.g. 15 unifont
+                # columns → 896 font units = same as 7 provider columns at 128).
+                width, height = tile["size"]
+                ascent = tile.get("ascent", 0)
+                if tile.get("source") == "unifont" and ascent > 0:
+                    scale = ASCENT / ascent
+                else:
+                    scale = UNITS_PER_EM / height
+                tile["units_per_pixel"] = scale
+
                 pixels = tile.get("pixels")
                 if not pixels:
                     tile["scaled"] = {"outer": [], "holes": []}
@@ -700,8 +715,6 @@ def precompute_glyph_scaling(glyph_map):
                     continue
 
                 min_x = min(x for x, y in all_points)
-                width, height = tile["size"]
-                scale = UNITS_PER_EM / height
                 descender_offset = ASCENT / scale
 
                 def transform(pt, _min_x=min_x, _s=scale, _do=descender_offset):
