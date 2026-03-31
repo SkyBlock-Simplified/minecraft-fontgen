@@ -62,9 +62,9 @@ The pipeline runs sequentially through six stages:
 ### Glyph Processing
 
 - `minecraft_fontgen.file_io:_trace_bitmap_contours` - Core contour tracing: flood-fill labels pixel groups, traces boundary edges using right-hand rule, extracts corner points for vector outlines. Bold glyphs get a 1px rightward expansion before tracing
-- `minecraft_fontgen.file_io:precompute_glyph_scaling` - Scales glyph coordinates from pixel space to font units, splits self-touching contours at duplicate vertices, and insets shared vertices between contours. This is style-independent; only italic shear differs and is applied as a lightweight post-transform per font
-- `minecraft_fontgen.glyph.glyph:Glyph` - Assigns pre-computed scaled coordinates, applies italic shear transform if needed, draws contours with winding direction based on geometric nesting depth via fontTools pen (T2CharStringPen for CFF, TTGlyphPen for TrueType)
-- `minecraft_fontgen.glyph.glyph_storage:GlyphStorage` - Accumulates glyphs, manages cmap table entries (Format 4 for BMP, Format 12 for SMP), writes final glyph order and metrics
+- `minecraft_fontgen.file_io:precompute_glyph_scaling` - Scales glyph coordinates from pixel space to font units using `UNITS_PER_EM / tile_height` (e.g. 128 for 8px provider glyphs, 64 for 16px unifont glyphs). Splits self-touching contours at duplicate vertices and insets shared vertices between contours. This is style-independent; only italic shear differs and is applied as a lightweight post-transform per font
+- `minecraft_fontgen.glyph.glyph:Glyph` - Assigns pre-computed scaled coordinates, applies italic shear transform if needed, draws contours with winding direction based on geometric nesting depth via fontTools pen (T2CharStringPen for CFF, TTGlyphPen for TrueType). Advance width in the CFF pen uses `self.size[1]` (tile height) for the scale factor
+- `minecraft_fontgen.glyph.glyph_storage:GlyphStorage` - Accumulates glyphs, manages cmap table entries (Format 4 for BMP, Format 12 for SMP), writes final glyph order and metrics. Advance width calculation uses `glyph.size[1]` (tile height) for the scale factor
 
 ### Font Table Modules (minecraft_fontgen/table/)
 
@@ -87,7 +87,7 @@ Configuration is module-level constants, not CLI args (unless noted). Key settin
 - `OPENTYPE = True` - CFF (OpenType) vs TrueType outlines (overridable via `--type`/`FONTGEN_TYPE`)
 - `UNIFONT = True` - Include GNU Unifont fallback glyphs
 - `FONT_STYLES` - List of dicts defining all font styles. Each has `name`, `enabled`, `bold`, `italic`, `pixel_style`, `debug`. Alternate styles also have `json_file` and `map_lowercase`. Toggle `enabled` to include/exclude a style. The `debug` dict has keys `svg` (pixel grid SVGs + path SVGs for provider tiles), `bmp` (cropped glyph bitmaps), and `unifont` (pixel grid SVGs for unifont fallback glyphs), all defaulting to `False`
-- `UNITS_PER_EM = 1024`, `DEFAULT_GLYPH_SIZE = 8` - Font metrics
+- `UNITS_PER_EM = 1024`, `DEFAULT_GLYPH_SIZE = 8` - Font metrics. `DEFAULT_GLYPH_SIZE` is a fallback default for missing tile sizes; the actual scale factor uses each tile's height from `tile["size"][1]` (8 for provider glyphs, 16 for unifont)
 - `BOUNDING_BOX = [0, -128, 1152, 896]` - Global glyph bounds
 - `OUTPUT_FONT_NAME = "Minecraft"` - Output font family name
 
@@ -118,7 +118,7 @@ Configuration lives in `config.py:FONT_STYLES` — alternate styles are identifi
 
 ### Unifont Fallback
 
-When `UNIFONT = True`, GNU Unifont hex files are downloaded from Minecraft's asset index and parsed into 16-row bitmap grids (`minecraft_fontgen.piston:parse_unifont_hex_bytes`). These are traced into tile dicts via `trace_unifont_tiles` and merged as fallbacks (lower priority than provider glyphs) in `build_glyph_map`. The `UNIFONT_RANGES` config controls which Unicode ranges are included.
+When `UNIFONT = True`, GNU Unifont hex files are downloaded from Minecraft's asset index and parsed into 16-row bitmap grids (`minecraft_fontgen.piston:parse_unifont_hex_bytes`). These are traced into tile dicts via `trace_unifont_tiles` and merged as fallbacks (lower priority than provider glyphs) in `build_glyph_map`. The `UNIFONT_RANGES` config controls which Unicode ranges are included. Unifont glyphs are duospaced (8px half-width or 16px full-width) in a 16px-tall grid. The scale factor `UNITS_PER_EM / 16 = 64` gives full-width glyphs 1.0em advance and half-width glyphs ~0.5em advance.
 
 ### Directory Layout at Runtime
 
