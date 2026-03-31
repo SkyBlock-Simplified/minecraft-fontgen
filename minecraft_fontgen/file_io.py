@@ -701,13 +701,13 @@ def precompute_glyph_scaling(glyph_map):
 
                 min_x = min(x for x, y in all_points)
                 width, height = tile["size"]
-                scale_x = UNITS_PER_EM / width
-                scale_y = UNITS_PER_EM / height
-                descender_offset = height - 1
+                ascent = tile["ascent"]
+                scale = UNITS_PER_EM / DEFAULT_GLYPH_SIZE
+                descender_offset = ascent
 
-                def transform(pt, _min_x=min_x, _sx=scale_x, _sy=scale_y, _do=descender_offset):
+                def transform(pt, _min_x=min_x, _s=scale, _do=descender_offset):
                     x, y = pt
-                    return ((x - _min_x) * _sx, (_do - y) * _sy)
+                    return ((x - _min_x) * _s, (_do - y) * _s)
 
                 scaled_outer = [[transform(pt) for pt in path] for path in outer_paths]
                 scaled_holes = [[transform(pt) for pt in path] for path in hole_paths]
