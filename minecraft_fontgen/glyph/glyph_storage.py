@@ -114,18 +114,9 @@ class GlyphStorage:
         advances = [aw for (aw, _lsb) in self.hmtx.values() if aw is not None]
         self.font["OS/2"].xAvgCharWidth = int(round(sum(advances) / len(advances))) # Average character width (mean of the advanced widths)
 
-        # Update vertical metrics to encompass all glyph extents
+        # Update head table bounding box to encompass all glyph extents
         y_max = ceil(self.y_max)
         y_min = floor(self.y_min)
-        y_min_abs = abs(y_min)
-        if y_max > self.font["hhea"].ascent:
-            self.font["hhea"].ascent = y_max
-            self.font["OS/2"].usWinAscent = y_max
-        if y_min_abs > self.font["OS/2"].usWinDescent:
-            self.font["hhea"].descent = -y_min_abs
-            self.font["OS/2"].usWinDescent = y_min_abs
-
-        # Update head table bounding box to encompass all glyph extents
         if y_max > self.font["head"].yMax:
             self.font["head"].yMax = y_max
         if y_min < self.font["head"].yMin:
