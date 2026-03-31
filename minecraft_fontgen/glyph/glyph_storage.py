@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from math import ceil
+from math import ceil, floor
 
 from minecraft_fontgen.glyph.glyph import Glyph
 from minecraft_fontgen.config import NOTDEF, DEFAULT_GLYPH_SIZE, UNITS_PER_EM
@@ -32,7 +32,7 @@ class GlyphStorage:
     def add(self, glyph: Glyph):
         """Adds a drawn glyph to storage with its advance width, LSB, and cmap mappings."""
         name = glyph.name
-        units_per_pixel = UNITS_PER_EM / glyph.size[0]
+        units_per_pixel = UNITS_PER_EM / DEFAULT_GLYPH_SIZE
         advance_width = UNITS_PER_EM // 2 if name in ("space", "uni0020") else int(round((glyph.width + 1) * units_per_pixel))
         lsb = 0
 
@@ -116,13 +116,20 @@ class GlyphStorage:
 
         # Update vertical metrics to encompass all glyph extents
         y_max = ceil(self.y_max)
-        y_min_abs = ceil(abs(self.y_min))
+        y_min = floor(self.y_min)
+        y_min_abs = abs(y_min)
         if y_max > self.font["hhea"].ascent:
             self.font["hhea"].ascent = y_max
             self.font["OS/2"].usWinAscent = y_max
         if y_min_abs > self.font["OS/2"].usWinDescent:
             self.font["hhea"].descent = -y_min_abs
             self.font["OS/2"].usWinDescent = y_min_abs
+
+        # Update head table bounding box to encompass all glyph extents
+        if y_max > self.font["head"].yMax:
+            self.font["head"].yMax = y_max
+        if y_min < self.font["head"].yMin:
+            self.font["head"].yMin = y_min
 
     def save(self, output_file):
         """Saves the assembled font to an output file."""
