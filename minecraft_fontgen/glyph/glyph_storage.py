@@ -121,6 +121,12 @@ class GlyphStorage:
         if y_min < self.font["head"].yMin:
             self.font["head"].yMin = y_min
 
+        # Update Windows clipping metrics to prevent clipping of accented glyphs
+        if y_max > self.font["OS/2"].usWinAscent:
+            self.font["OS/2"].usWinAscent = y_max
+        if abs(y_min) > self.font["OS/2"].usWinDescent:
+            self.font["OS/2"].usWinDescent = abs(y_min)
+
     def save(self, output_file):
         """Saves the assembled font to an output file."""
         self.font.save(output_file)
