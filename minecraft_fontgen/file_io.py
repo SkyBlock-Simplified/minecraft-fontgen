@@ -685,17 +685,20 @@ def precompute_glyph_scaling(glyph_map):
                 progress.update(1)
 
                 # Compute scale factor.
-                # Provider tiles: UNITS_PER_EM / height maps full grid to 1em (all providers
-                # share descent=-128 regardless of their ascent/height ratio).
-                # Unifont tiles: ASCENT / ascent maps ascent rows to ASCENT (896),
-                # making ink dimensions match provider equivalents (e.g. 15 unifont
-                # columns → 896 font units = same as 7 provider columns at 128).
+                # Provider glyphs use a uniform pixel scale (UNITS_PER_EM /
+                # DEFAULT_GLYPH_SIZE = 128) so that 1 Minecraft pixel = 1 font
+                # unit regardless of provider height.  This keeps the base
+                # character of accented glyphs (height=12) the same size as the
+                # equivalent standard glyph (height=8), with accents extending
+                # above the normal ascent line.
+                # Unifont fallback glyphs use ASCENT / ascent to compress 16px
+                # rows into the same visual space as 8px provider rows.
                 width, height = tile["size"]
                 ascent = tile.get("ascent", 0)
                 if tile.get("source") == "unifont" and ascent > 0:
                     scale = ASCENT / ascent
                 else:
-                    scale = UNITS_PER_EM / height
+                    scale = UNITS_PER_EM / DEFAULT_GLYPH_SIZE
                 tile["units_per_pixel"] = scale
 
                 pixels = tile.get("pixels")
@@ -715,7 +718,7 @@ def precompute_glyph_scaling(glyph_map):
                     continue
 
                 min_x = min(x for x, y in all_points)
-                descender_offset = ASCENT / scale
+                descender_offset = ascent if ascent > 0 else ASCENT / scale
 
                 def transform(pt, _min_x=min_x, _s=scale, _do=descender_offset):
                     x, y = pt
