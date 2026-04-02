@@ -242,9 +242,8 @@ The generated fonts include glyphs from two sources:
 > Unifont contains ~113,000 glyphs across BMP and SMP, but CFF fonts are limited
 > to 65,535 glyphs. The `UNIFONT_RANGES` list in
 > [`config.py`](minecraft_fontgen/config.py) controls which Unicode blocks are
-> included. Each block can be toggled `True`/`False` to customize coverage.
-> For Minecraft 1.12.2 and earlier, `UNIFONT_RANGES` controls which codepoints
-> are included from `glyph_sizes.bin` instead.
+> included from Unifont (1.13+) or `glyph_sizes.bin` (1.12.2 and earlier). Each
+> block can be toggled `True`/`False` to customize coverage.
 
 <details>
 <summary>BMP coverage - Basic Multilingual Plane (U+0000–U+FFFF)</summary>
