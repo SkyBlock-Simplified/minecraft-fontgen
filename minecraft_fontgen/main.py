@@ -7,7 +7,7 @@ from minecraft_fontgen.file_io import clean_directories, parse_provider_file, bu
 from minecraft_fontgen.font_creator import create_font_files
 from minecraft_fontgen.config import OUTPUT_FONT_NAME
 from minecraft_fontgen.functions import set_silent, log, validate_fonts
-from minecraft_fontgen.preview_font import write_preview_image
+from minecraft_fontgen.preview_font import write_preview_image, write_render_image
 
 # Force UTF-8 output to handle emoji in print statements
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
@@ -38,8 +38,9 @@ def main():
         # Validate with FontForge (development only: --validate or FONTGEN_VALIDATE=1)
         validate_fonts(font_files)
 
-        # Write visual preview image
+        # Write visual preview images
         write_preview_image(font_files, output_dir)
+        write_render_image(font_files[0], output_dir)
 
     log("Done.")
 
