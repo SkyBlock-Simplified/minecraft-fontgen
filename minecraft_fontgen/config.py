@@ -180,4 +180,5 @@ UNIFONT_RANGES = [
     (0xFE50, 0xFE6F),   # Small Form Variants
     (0xFF01, 0xFF5E),   # Fullwidth ASCII
     (0xFFF0, 0xFFFD),   # Specials
+    (0x1F900, 0x1F9FF), # Supplemental Symbols and Pictographs (SMP)
 ]
