@@ -155,16 +155,25 @@ UNIFONT_RANGES = [
     (0x0750, 0x077F),   # Arabic Supplement
     (0x0780, 0x07BF),   # Thaana
     (0x07C0, 0x07FF),   # NKo
+    (0x0900, 0x097F),   # Devanagari
+    (0x0D00, 0x0D7F),   # Malayalam
+    (0x0D80, 0x0DFF),   # Sinhala
     (0x0E00, 0x0E7F),   # Thai
+    (0x0F00, 0x0FFF),   # Tibetan
     (0x10A0, 0x10FF),   # Georgian
     (0x1100, 0x11FF),   # Hangul Jamo
+    (0x1200, 0x137F),   # Ethiopic
+    (0x1800, 0x18AF),   # Mongolian
     (0x1D00, 0x1DFF),   # Phonetic Extensions + Supplement + Combining Marks Supp
     (0x1E00, 0x1FFF),   # Latin Extended Additional + Greek Extended
     (0x2000, 0x2BFF),   # General Punctuation through Misc Symbols and Arrows
     (0x2C00, 0x2C7F),   # Glagolitic + Latin Extended-C
     (0x2C80, 0x2CFF),   # Coptic
     (0x2E00, 0x2E7F),   # Supplemental Punctuation
+    (0xA000, 0xA4CF),   # Yi Syllables + Yi Radicals
+    (0xA500, 0xA63F),   # Vai
     (0xA720, 0xA7FF),   # Latin Extended-D
+    (0xAA00, 0xAA5F),   # Cham
     (0xAB30, 0xAB6F),   # Latin Extended-E
     (0xFB00, 0xFB06),   # Latin ligatures (Alphabetic Presentation Forms)
     (0xFE20, 0xFE2F),   # Combining Half Marks
