@@ -238,12 +238,11 @@ The generated fonts include glyphs from two sources:
 1. **Minecraft bitmap providers** - Glyphs from the game's PNG textures (always included)
 2. **GNU Unifont fallback** - Additional glyphs from [GNU Unifont](https://unifoundry.com/unifont/) for broader script coverage (1.13+)
 
-Unifont contains ~113,000 glyphs across BMP and SMP, but CFF fonts are limited
-to 65,535 glyphs. The `UNIFONT_RANGES` list in
-[`config.py`](minecraft_fontgen/config.py) controls which Unicode blocks are
-included. Each block can be toggled `True`/`False` to customize coverage.
-
-> [!NOTE]
+> [!IMPORTANT]
+> Unifont contains ~113,000 glyphs across BMP and SMP, but CFF fonts are limited
+> to 65,535 glyphs. The `UNIFONT_RANGES` list in
+> [`config.py`](minecraft_fontgen/config.py) controls which Unicode blocks are
+> included. Each block can be toggled `True`/`False` to customize coverage.
 > For Minecraft 1.12.2 and earlier, `UNIFONT_RANGES` controls which codepoints
 > are included from `glyph_sizes.bin` instead.
 
