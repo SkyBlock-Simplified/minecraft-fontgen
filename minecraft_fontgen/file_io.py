@@ -1,9 +1,10 @@
+import math
 import os
 import shutil
 import sys
 import numpy as np
 
-from collections import deque, OrderedDict
+from collections import defaultdict, deque, OrderedDict
 from tqdm import tqdm
 from PIL import Image
 from minecraft_fontgen.config import ASCENT, COLUMNS_PER_ROW, DEFAULT_GLYPH_SIZE, OUTPUT_DIR, MINECRAFT_JAR_DIR, WORK_DIR, UNITS_PER_EM, TEXTURE_PATH, FONT_STYLES
@@ -280,7 +281,7 @@ def _trace_tile_style(tile, bold: bool = False):
     """Converts a tile's PIL bitmap image to a binary numpy grid and traces its contours."""
     bitmap_grid = np.array(tile["bitmap"]["image"].convert("L"), dtype=int)
     bitmap_grid = (bitmap_grid < 128).astype(np.uint8)
-    return _trace_bitmap_contours(bitmap_grid, bold)
+    return _trace_bitmap_contours2(bitmap_grid, bold)
 
 def _trace_bitmap_contours(bitmap_grid, bold: bool = False):
     """Traces contours from a binary bitmap grid using flood-fill labeling and right-hand edge
@@ -449,6 +450,358 @@ def _trace_bitmap_contours(bitmap_grid, bold: bool = False):
         "holes": {label: get_path_data(pixel_grid, label) for label in hole_labels}
     }
 
+def _trace_bitmap_contours2(bitmap_grid, bold: bool = False):
+    """Traces contours from a binary bitmap grid using flood-fill labeling and multi-loop
+    boundary-edge extraction. Unlike _trace_bitmap_contours which uses a single right-hand
+    rule traversal per label (capturing only one loop), this function collects ALL boundary
+    edges for each labeled region and extracts every closed loop, correctly handling
+    regions with complex internal topology (e.g. U+26C3 chess rook where battlements
+    create disconnected boundary loops that a single traversal misses).
+
+    For labels whose boundary edges form multiple disconnected loops, the largest-area
+    loop is kept as the primary contour for that label. The smaller sub-loops represent
+    islands of the opposite type (filled islands inside holes, or hole islands inside
+    filled regions) and are redistributed to the opposite dict (paths or holes) so that
+    downstream even-odd nesting depth logic correctly determines fill.
+
+    Returns contour data with labeled grid, path corners, hole corners, advance width,
+    and left side bearing for font glyph construction. The return format matches
+    _trace_bitmap_contours: paths and holes dicts map integer keys to dicts with
+    "coords" (full-edge vertex loop) and "corners" (direction-change vertices only).
+    """
+    height, width = bitmap_grid.shape
+    pixel_grid = np.full((height, width), -999, dtype=int)
+
+    if bold:
+        for i in range(bitmap_grid.shape[0] - 1, -1, -1):
+            for j in range(bitmap_grid.shape[1] - 1, -1, -1):
+                if bitmap_grid[i, j] == 1 and j + 1 < bitmap_grid.shape[1] and bitmap_grid[i, j + 1] == 0:
+                    bitmap_grid[i, j + 1] = 1
+
+    def update_grid(queue, bit_match, next_label, neighbours=None):
+        while queue:
+            cy, cx = queue.popleft()
+            if pixel_grid[cy, cx] == -999:
+                pixel_grid[cy, cx] = next_label
+            for dy, dx in neighbours or [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                ny, nx = cy + dy, cx + dx
+                if 0 <= ny < height and 0 <= nx < width:
+                    if bitmap_grid[ny, nx] == bit_match and pixel_grid[ny, nx] == -999:
+                        pixel_grid[ny, nx] = next_label
+                        queue.append((ny, nx))
+
+    def label_groups(bit_match, increment, neighbours=None):
+        next_label = 0 + increment
+        labels = []
+        for y in range(height):
+            for x in range(width):
+                if bitmap_grid[y, x] == bit_match and pixel_grid[y, x] == -999:
+                    q = deque()
+                    q.append((y, x))
+                    pixel_grid[y, x] = next_label
+                    labels.append(next_label)
+                    update_grid(q, bit_match, next_label, neighbours)
+                    next_label += increment
+        return labels
+
+    # Label glyph groups as 1 and above (8-connectivity)
+    path_labels = label_groups(1, 1, [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)])
+
+    # Flood-fill outer background as 0
+    q = deque()
+    for x in range(width):
+        if bitmap_grid[0, x] == 0: q.append((0, x))
+        if bitmap_grid[height - 1, x] == 0: q.append((height - 1, x))
+    for y in range(height):
+        if bitmap_grid[y, 0] == 0: q.append((y, 0))
+        if bitmap_grid[y, width - 1] == 0: q.append((y, width - 1))
+    update_grid(q, 0, 0)
+
+    # Label interior holes as -1 and below (4-connectivity)
+    hole_labels = label_groups(0, -1)
+
+    def _get_boundary_edges(pixel_grid, label):
+        """Collects all CW-directed boundary edges for a labeled region.
+
+        Each pixel contributes 4 edges going CW around its square. Edges shared
+        by two same-label pixels cancel out, leaving only boundary edges.
+        Returns pixel coords list and the set of directed boundary edges.
+        """
+        coords = [(int(x), int(y)) for y, x in np.argwhere(pixel_grid == label)]
+        label_set = set(coords)
+
+        def pixel_edges(x, y):
+            return [((x, y), (x + 1, y)),
+                    ((x + 1, y), (x + 1, y + 1)),
+                    ((x + 1, y + 1), (x, y + 1)),
+                    ((x, y + 1), (x, y))]
+
+        edge_count = {}
+        for x, y in label_set:
+            for edge in pixel_edges(x, y):
+                rev = edge[::-1]
+                if rev in edge_count:
+                    edge_count[rev] -= 1
+                else:
+                    edge_count[edge] = edge_count.get(edge, 0) + 1
+
+        boundary = {e for e, count in edge_count.items() if count > 0}
+        return coords, boundary
+
+    def _extract_all_loops(boundary_edges):
+        """Extracts ALL closed loops from the set of CW boundary edges.
+
+        Builds an adjacency map from edge endpoints, then repeatedly picks an
+        unvisited edge and traces a loop by always taking the tightest CW turn
+        at each vertex (smallest clockwise angle from the reverse of the arrival
+        direction).
+
+        Only the original CW boundary edges are used (no CCW reverse edges).
+        Returns a list of loops, where each loop is a list of vertex coordinates.
+        """
+        if not boundary_edges:
+            return []
+
+        # Build adjacency: vertex -> set of outgoing edge endpoints
+        adj = defaultdict(set)
+        for (a, b) in boundary_edges:
+            adj[a].add(b)
+
+        remaining = set(boundary_edges)
+        loops = []
+
+        while remaining:
+            # Pick the topmost-leftmost starting edge for determinism
+            start_edge = min(remaining, key=lambda e: (e[0][1], e[0][0]))
+            loop = [start_edge[0]]
+            prev, curr = start_edge
+            remaining.discard(start_edge)
+
+            for _ in range(len(boundary_edges) + 1):
+                loop.append(curr)
+
+                # Compute arrival direction (reversed) to measure CW turns from
+                arrival_dx = curr[0] - prev[0]
+                arrival_dy = curr[1] - prev[1]
+                reverse_angle = math.atan2(-(-arrival_dy), -arrival_dx)
+
+                # Find all outgoing edges from curr that are still in remaining
+                candidates = [n for n in adj[curr] if (curr, n) in remaining]
+
+                if not candidates:
+                    break
+
+                # Pick the tightest CW turn: smallest positive angle difference
+                # from reverse_angle going clockwise
+                best = None
+                best_diff = None
+                for n in candidates:
+                    dx = n[0] - curr[0]
+                    dy = n[1] - curr[1]
+                    out_angle = math.atan2(-dy, dx)
+                    diff = reverse_angle - out_angle
+                    while diff <= 0:
+                        diff += 2 * math.pi
+                    while diff > 2 * math.pi:
+                        diff -= 2 * math.pi
+                    if best_diff is None or diff < best_diff:
+                        best_diff = diff
+                        best = n
+
+                remaining.discard((curr, best))
+                prev, curr = curr, best
+
+                if curr == loop[0]:
+                    break
+
+            # Close the loop: remove trailing duplicate of start
+            if len(loop) >= 2 and loop[-1] == loop[0]:
+                loop.pop()
+
+            if len(loop) >= 3:
+                loops.append(loop)
+
+        return loops
+
+    def _extract_corners(path):
+        """Extracts corner points where direction changes along the path."""
+        n = len(path)
+        if n < 3:
+            return list(path)
+
+        corners = []
+        for i in range(n):
+            prev = path[(i - 1) % n]
+            curr = path[i]
+            nxt = path[(i + 1) % n]
+            dir1 = (curr[0] - prev[0], curr[1] - prev[1])
+            dir2 = (nxt[0] - curr[0], nxt[1] - curr[1])
+            if dir1 != dir2:
+                corners.append(curr)
+
+        return corners
+
+    def _loop_area(loop):
+        """Computes the absolute area of a closed loop using the shoelace formula."""
+        n = len(loop)
+        return abs(sum(
+            (loop[(i + 1) % n][0] - loop[i][0]) * (loop[(i + 1) % n][1] + loop[i][1])
+            for i in range(n)
+        )) / 2.0
+
+    def _merge_loops_via_halfedge(boundary_edges):
+        """Merges multi-loop boundaries into a single contour using half-edge face traversal.
+
+        When the simple edge-following extraction produces multiple loops (due to
+        pinch points where the boundary touches itself), this function adds reverse
+        (CCW) half-edges and performs a planar face traversal. The largest CW face
+        (in screen coords) is the correctly indented boundary that traces around
+        internal islands.
+
+        Only called when simple extraction produces >1 loop; single-loop boundaries
+        use the simple result directly to avoid spurious faces.
+        """
+        ccw_edges = {(b, a) for (a, b) in boundary_edges}
+        all_he = boundary_edges | ccw_edges
+
+        adj = defaultdict(list)
+        for (a, b) in all_he:
+            adj[a].append(b)
+        for v in adj:
+            adj[v].sort(key=lambda n: math.atan2(-(n[1] - v[1]), n[0] - v[0]))
+
+        def _screen_angle(dx, dy):
+            return math.atan2(-dy, dx)
+
+        used = set()
+        cw_faces = []
+
+        sorted_he = sorted(all_he, key=lambda e: (e[0][1], e[0][0], e[1][1], e[1][0]))
+        for start_he in sorted_he:
+            if start_he in used:
+                continue
+            face = [start_he[0]]
+            u, v = start_he
+            used.add(start_he)
+
+            for _ in range(len(all_he)):
+                face.append(v)
+                arrival_dx = v[0] - u[0]
+                arrival_dy = v[1] - u[1]
+                reverse_angle = _screen_angle(-arrival_dx, -arrival_dy)
+
+                candidates = [n for n in adj[v] if (v, n) in all_he and (v, n) not in used]
+                if not candidates:
+                    break
+
+                best = min(candidates, key=lambda c: (
+                    lambda d: (d if d > 0 else d + 2 * math.pi)
+                )(reverse_angle - _screen_angle(c[0] - v[0], c[1] - v[1])))
+
+                used.add((v, best))
+                u, v = v, best
+                if v == face[0]:
+                    break
+
+            if len(face) >= 2 and face[-1] == face[0]:
+                face.pop()
+            if len(face) >= 3:
+                n = len(face)
+                area = sum(
+                    (face[(i + 1) % n][0] - face[i][0]) * (face[(i + 1) % n][1] + face[i][1])
+                    for i in range(n)
+                ) / 2
+                if area > 0:
+                    cw_faces.append((face, area))
+
+        if not cw_faces:
+            return None
+        # Return the largest CW face
+        cw_faces.sort(key=lambda x: x[1], reverse=True)
+        return cw_faces[0][0]
+
+    def _get_primary_contour(pixel_grid, label):
+        """Extracts the primary boundary contour for a labeled region.
+
+        Uses simple loop extraction first. If only one loop is found, uses it
+        directly. If multiple loops are found (pinch points), falls back to
+        half-edge face traversal to produce the correctly indented boundary.
+        """
+        coords, boundary = _get_boundary_edges(pixel_grid, label)
+        loops = _extract_all_loops(boundary)
+
+        if not loops:
+            return {"coords": coords, "corners": []}
+
+        if len(loops) == 1:
+            corners = _extract_corners(loops[0])
+            return {"coords": loops[0], "corners": corners}
+
+        # Multiple loops: use half-edge merge to get the indented boundary
+        merged = _merge_loops_via_halfedge(boundary)
+        if merged:
+            corners = _extract_corners(merged)
+            return {"coords": merged, "corners": corners}
+
+        # Fallback: largest simple loop
+        loops.sort(key=_loop_area, reverse=True)
+        corners = _extract_corners(loops[0])
+        return {"coords": loops[0], "corners": corners}
+
+    # Build paths and holes dicts.
+    # Path labels: keep only the largest loop. Sub-loops are inner boundaries
+    # that hole contours already cover (e.g. the inner ring of letter O).
+    # Hole labels: if multiple loops exist, merge via half-edge to produce
+    # the indented boundary that traces around path-pixel islands (e.g. the
+    # battlements inside U+26C3's Hole -4). Single-loop holes use the loop directly.
+    paths = {}
+    for label in path_labels:
+        coords, boundary = _get_boundary_edges(pixel_grid, label)
+        loops = _extract_all_loops(boundary)
+        if loops:
+            loops.sort(key=_loop_area, reverse=True)
+            corners = _extract_corners(loops[0])
+            paths[label] = {"coords": loops[0], "corners": corners}
+        else:
+            paths[label] = {"coords": coords, "corners": []}
+
+    holes = {}
+    for label in hole_labels:
+        coords, boundary = _get_boundary_edges(pixel_grid, label)
+        loops = _extract_all_loops(boundary)
+        if not loops:
+            holes[label] = {"coords": coords, "corners": []}
+        elif len(loops) == 1:
+            corners = _extract_corners(loops[0])
+            holes[label] = {"coords": loops[0], "corners": corners}
+        else:
+            # Multiple loops: merge via half-edge to get indented boundary
+            merged = _merge_loops_via_halfedge(boundary)
+            if merged:
+                corners = _extract_corners(merged)
+                holes[label] = {"coords": merged, "corners": corners}
+            else:
+                loops.sort(key=_loop_area, reverse=True)
+                corners = _extract_corners(loops[0])
+                holes[label] = {"coords": loops[0], "corners": corners}
+
+    # Determine glyph sides
+    col_sums = pixel_grid.sum(axis=0)
+    col_ones = np.where(col_sums > 0)[0]
+    min_x = col_ones[0] if len(col_ones) > 0 else 0
+    max_x = col_ones[-1] if len(col_ones) > 0 else DEFAULT_GLYPH_SIZE - 1
+    glyph_width = col_ones[-1] - col_ones[0] + 1 if len(col_ones) > 0 else DEFAULT_GLYPH_SIZE
+
+    return {
+        "bitmap": bitmap_grid,
+        "grid": pixel_grid,
+        "width": (max_x - min_x + 1),
+        "lsb": min_x,
+        "advance": (min_x + glyph_width + 1),
+        "paths": paths,
+        "holes": holes
+    }
+
 def _write_tile_svg(grid, size, output_file):
     """Renders a pixel grid as an SVG file with 1x1 rect elements."""
     width, height = size
@@ -548,7 +901,7 @@ def trace_unifont_tiles(unifont_glyphs, bold=False):
               ncols=80, leave=False, file=sys.stdout, disable=is_silent()) as progress:
         for codepoint, bitmap_rows in progress:
             bitmap_grid = np.array(bitmap_rows, dtype=np.uint8)
-            pixel_data = _trace_bitmap_contours(bitmap_grid, bold)
+            pixel_data = _trace_bitmap_contours2(bitmap_grid, bold)
             width = len(bitmap_rows[0]) if bitmap_rows else 8
 
             svg = None
@@ -631,7 +984,7 @@ def _process_alternate_font(alt_config, regular_map):
 
         bitmap_grid = np.array(tile_img.convert("L"), dtype=int)
         bitmap_grid = (bitmap_grid < 128).astype(np.uint8)
-        pixel_data = _trace_bitmap_contours(bitmap_grid, bold=False)
+        pixel_data = _trace_bitmap_contours2(bitmap_grid, bold=False)
 
         tile = {
             "unicode": unicode_char,
