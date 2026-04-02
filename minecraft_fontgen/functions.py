@@ -42,9 +42,9 @@ def parse_json(text):
     return json.loads(cleaned)
 
 def in_unifont_ranges(codepoint):
-    """Returns True if the codepoint falls within any configured UNIFONT_RANGES."""
-    for start, end in config.UNIFONT_RANGES:
-        if start <= codepoint <= end:
+    """Returns True if the codepoint falls within any enabled UNIFONT_RANGES entry."""
+    for start, end, enabled in config.UNIFONT_RANGES:
+        if enabled and start <= codepoint <= end:
             return True
     return False
 
